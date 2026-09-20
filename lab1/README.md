@@ -52,3 +52,38 @@
 
 <img width="972" height="107" alt="image" src="https://github.com/user-attachments/assets/11091f2a-e1a0-4afd-b41c-1117aaf37eca" />
 
+## Часть 4
+### Ограничение с помощью привилегий
+Для начала с помощью следующей команды запретим внутри нашего контейнера дополнительные возможности с помощью ограничения привилегий:
+
+*unshare --pid --mount --net --uts --ipc --user --map-root-user --fork \
+  --mount-proc \
+  setpriv --inh-caps=-all --ambient-caps=-all --bounding-set=-all \
+    ./api*
+
+<img width="958" height="136" alt="image" src="https://github.com/user-attachments/assets/739f5a67-064a-40d1-9c6c-1a0c467de01b" />
+
+Эта команда помимо оговорённого в части 2 запускает процесс с указанными привилегиями, в данном случае с указанием отсутствия привилегий (у всех атрибутов стоит выключение). setpriv не запускает отдельный процесс, а подменяет свой процессом api (execve).
+- Атрибут inh-caps влияет на передачу набора привилегий процессам-потомкам при exeve
+- Атрибут ambient-caps делает так, что никакой набор привилегий не сохранится при exeve
+- Атрибут bounding-set в данном случае навсегда лишает процесс шанса на получение какой-то привелегии даже от root'а
+
+На картинке снизу демонстрируется, что пользователь внутри процесса не может изменить время, потому что не имеет на это прав.
+
+<img width="960" height="278" alt="image" src="https://github.com/user-attachments/assets/e44ad9d9-d5ab-4bdf-8ecc-76ef75ae09d8" />
+
+### Блокировка системного вызова
+С помощью команды ниже мы помимо вышеописанного запрещаем изнутри контейнера делать системный вызов, отвечающий за создание директории:
+*systemd-run --user --wait --pty   -p SystemCallFilter="~mkdir"   -p SystemCallErrorNumber=EPERM   unshare --pid --mount --net --uts --ipc --user --map-root-user --fork   --mount-proc   setpriv --inh-caps=-all --ambient-caps=-all --bounding-set=-all /home/alexandr/Desktop/containerization-labs/lab1/api*
+
+<img width="958" height="141" alt="image" src="https://github.com/user-attachments/assets/928cfdd3-6804-4988-b2fe-f953295d7fb0" />
+
+- Флаг user запускает модуль от имени пользовательского менеджера systemd (user@UID.service), а не системного. Не нужен root. Настройки применяются в рамках сессии.
+- Флаг wait задаёт ожидание выполнения команды
+- Флаг pty подключает псевдотерминал (PTY) — чтобы вывод команды шёл в ваш терминал в реальном времени, как при обычном запуске.
+- Seccomp фильтр SystemCallFilter="~mkdir" запрещает вызов mkdir
+- SystemCallErrorNumber=EPERM указывает, что при вызове запрещённого вызова нужно вернуть ошибку Operation not permitted
+
+При попытке создать папку получаем указанную ошибку:
+<img width="956" height="416" alt="image" src="https://github.com/user-attachments/assets/c40196a9-68f6-4aab-a10b-881ff923cc91" />
+
