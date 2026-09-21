@@ -98,6 +98,7 @@
 
 ## Часть 5
 ### Скрипт mydocker.sh
+
 Сам скрипт представлен в одноимённом файле.
 Запуск скрипта:
 
@@ -111,12 +112,31 @@
 
 ### Сравнение с docker run
 
-Создание контейнера (build):
-
-<img width="1052" height="425" alt="image" src="https://github.com/user-attachments/assets/d96bf400-150a-42cd-90d4-11a15a6e859c" />
-
 Проверка работоспособности:
 
 <img width="1061" height="402" alt="image" src="https://github.com/user-attachments/assets/9399b87d-2852-4755-b8e3-7a168da2e04c" />
 
 Docker перенаправляет запрос по порту 8080 сразу в соответствующий порт контейнера, nsenter не требуется, запрос отправляется сразу на localhost.
+
+## Часть 6
+### Dockerfile
+
+В Dockerfile описана vulti-stage сборка, а в Dockerfile.single с минимальной конфигурацией.
+
+Разницу между ними можно посмотреть на скриншоте снизу:
+
+<img width="928" height="399" alt="image" src="https://github.com/user-attachments/assets/9cf65523-7f9e-4a42-a5eb-1e6df0848909" />
+
+Многослойная сборка весит 4 Мб против 93 Мб у сборки с минимальной конфигурацией. К тому же образ многослойной сборки содержит только 3 слоя, а не 15.
+
+### Файл в контейнере и в томе
+
+Здесь демонстрируется, что файл, добавленный в контейнер удалился вместе с самим контейнером:
+
+<img width="929" height="390" alt="image" src="https://github.com/user-attachments/assets/eabde219-9f82-42d6-aae0-ae9129ea8451" />
+
+Здесь демонстрируется, что при сохранении в volume файл пережил удаление контейнера:
+
+<img width="926" height="462" alt="image" src="https://github.com/user-attachments/assets/eed1f609-e1d0-43b4-bf77-fb8aa6db23cc" />
+
+
