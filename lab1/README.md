@@ -96,3 +96,17 @@
 При попытке создать папку получаем указанную ошибку:
 <img width="956" height="416" alt="image" src="https://github.com/user-attachments/assets/c40196a9-68f6-4aab-a10b-881ff923cc91" />
 
+## Часть 5
+### Скрипт mydocker.sh
+Сам скрипт представлен в одноимённом файле.
+Запуск скрипта:
+
+<img width="748" height="69" alt="image" src="https://github.com/user-attachments/assets/f8e8ae8c-40b6-4a9b-8b3b-565d6e6bb403" />
+
+Проверка работоспособности:
+
+<img width="920" height="352" alt="image" src="https://github.com/user-attachments/assets/693722c3-56dd-4316-9fc0-cdd3b703a991" />
+
+Для скрипта использовали команды из предыдущих шагов, но из-за того, для активации lo внутри процесса сделали systemd фоновым, не блокирующим ввод последующих команд.
+
+### Сравнение с docker run
