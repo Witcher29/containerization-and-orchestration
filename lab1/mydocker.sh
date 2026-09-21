@@ -4,8 +4,6 @@ set -e
 
 API_PATH="/home/alexandr/Desktop/containerization-labs/lab1/api"
 CGROUP="/sys/fs/cgroup/lab-api"
-CGROUP_CPU="/sys/fs/cgroup/lab-api-cpu"
-CGROUP_PIDS="/sys/fs/cgroup/lab-api-pids"
 
 # --- 1. Готовим cgroup с лимитами ---
 sudo mkdir -p "$CGROUP"
