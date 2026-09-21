@@ -119,4 +119,4 @@
 
 <img width="1061" height="402" alt="image" src="https://github.com/user-attachments/assets/9399b87d-2852-4755-b8e3-7a168da2e04c" />
 
-Доступ к контейнеру Docker осуществляется напрямую, nsenter не требуется.
+Docker перенаправляет запрос по порту 8080 сразу в соответствующий порт контейнера, nsenter не требуется, запрос отправляется сразу на localhost.
