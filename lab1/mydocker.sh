@@ -2,7 +2,7 @@
 # mydocker.sh — свой Docker: namespaces + cgroup + capabilities + seccomp
 set -e
 
-API_PATH="/home/alexandr/Desktop/containerization-labs/lab1/api"
+API_PATH="/home/bulterier04/Desktop/itmo/containers/rep/containerization-and-orchestration/lab1/api"
 CGROUP="/sys/fs/cgroup/lab-api"
 
 # --- 1. Готовим cgroup с лимитами ---
