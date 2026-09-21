@@ -110,3 +110,13 @@
 Для скрипта использовали команды из предыдущих шагов, но из-за того, для активации lo внутри процесса сделали systemd фоновым, не блокирующим ввод последующих команд.
 
 ### Сравнение с docker run
+
+Создание контейнера (build):
+
+<img width="1052" height="425" alt="image" src="https://github.com/user-attachments/assets/d96bf400-150a-42cd-90d4-11a15a6e859c" />
+
+Проверка работоспособности:
+
+<img width="1061" height="402" alt="image" src="https://github.com/user-attachments/assets/9399b87d-2852-4755-b8e3-7a168da2e04c" />
+
+Доступ к контейнеру Docker осуществляется напрямую, nsenter не требуется.
