@@ -1,0 +1,6 @@
+FROM golang:1.22-alpine
+WORKDIR /app
+COPY api.go .
+RUN CGO_ENABLED=0 go build -o api api.go
+EXPOSE 8080
+ENTRYPOINT ["./api"]
