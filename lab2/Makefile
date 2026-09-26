@@ -59,13 +59,13 @@ port-forward-grafana: ## Grafana: localhost:3000
 	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-grafana 3000:80
 
 port-forward-prometheus: ## Prometheus: localhost:9090
-	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-kube-prometheus-prometheus 9090:9090
+	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-kube-prometh-prometheus 9090:9090
 
 port-forward-jaeger: ## Jaeger: localhost:16686
 	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-jaeger 16686:16686
 
 port-forward-alertmanager: ## Alertmanager: localhost:9093
-	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-kube-prometheus-alertmanager 9093:9093
+	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-kube-prometh-alertmanager 9093:9093
 
 clean: ## Удалить весь Kind-кластер
 	./cluster/delete.sh
