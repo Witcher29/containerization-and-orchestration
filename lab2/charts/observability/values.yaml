@@ -1,16 +1,12 @@
 kube-prometheus-stack:
   grafana:
     enabled: true
-
     adminUser: admin
     adminPassword: admin
-
     service:
       type: ClusterIP
-
     persistence:
       enabled: false
-
     sidecar:
       datasources:
         enabled: true
@@ -22,6 +18,7 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
 
+
 loki:
   deploymentMode: SingleBinary
 
@@ -30,6 +27,16 @@ loki:
 
     commonConfig:
       replication_factor: 1
+
+    schemaConfig:
+      configs:
+        - from: "2024-04-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
 
     storage:
       type: filesystem
@@ -49,26 +56,23 @@ loki:
   write:
     replicas: 0
 
+
 alloy:
   controller:
     type: daemonset
-
   alloy:
     configMap:
       create: false
 
+
 jaeger:
   provisionDataStore:
     cassandra: false
-
   storage:
-    type: memorycd
-
+    type: memory
   allInOne:
     enabled: true
-
   collector:
     enabled: false
-
   query:
     enabled: false
