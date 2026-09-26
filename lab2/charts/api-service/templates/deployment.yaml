@@ -6,31 +6,53 @@ metadata:
     app: {{ include "api-service.fullname" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
       app: {{ include "api-service.fullname" . }}
+
   template:
     metadata:
       labels:
         app: {{ include "api-service.fullname" . }}
+
     spec:
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
-            - containerPort: {{ .Values.service.targetPort }}
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+
           env:
+            - name: PORT
+              value: {{ .Values.env.port | quote }}
+
+            - name: SELF_URL
+              value: {{ .Values.env.selfUrl | quote }}
+
+            - name: LOAD_REQUESTS
+              value: {{ .Values.env.loadRequests | quote }}
+
+            - name: HTTP_CLIENT_TIMEOUT
+              value: {{ .Values.env.httpClientTimeout | quote }}
+
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.otel.endpoint | quote }}
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
           readinessProbe:
             httpGet:
               path: /health
               port: {{ .Values.service.targetPort }}
             initialDelaySeconds: 5
             periodSeconds: 10
+
           livenessProbe:
             httpGet:
               path: /health
