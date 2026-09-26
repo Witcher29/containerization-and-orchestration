@@ -27,6 +27,6 @@ deploy: cluster-up image-load ## Создать кластер, собрать �
 	  --wait
 
 port-forward: ## Пробросить API на localhost:8080
-	kubectl port-forward svc/api-service 8080:80
+	kubectl port-forward --address 0.0.0.0 svc/api-service 8080:80
 
 clean: cluster-down ## Удалить Kind-кластер
