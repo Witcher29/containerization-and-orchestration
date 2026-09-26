@@ -62,7 +62,7 @@ jaeger:
     cassandra: false
 
   storage:
-    type: memory
+    type: memorycd
 
   allInOne:
     enabled: true
