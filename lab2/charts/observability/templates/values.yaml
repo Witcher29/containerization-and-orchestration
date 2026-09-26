@@ -1,0 +1,74 @@
+kube-prometheus-stack:
+  grafana:
+    enabled: true
+
+    adminUser: admin
+    adminPassword: admin
+
+    service:
+      type: ClusterIP
+
+    persistence:
+      enabled: false
+
+    sidecar:
+      datasources:
+        enabled: true
+
+  prometheus:
+    prometheusSpec:
+      retention: 2d
+
+  alertmanager:
+    enabled: true
+
+loki:
+  deploymentMode: SingleBinary
+
+  loki:
+    auth_enabled: false
+
+    commonConfig:
+      replication_factor: 1
+
+    storage:
+      type: filesystem
+
+  singleBinary:
+    replicas: 1
+
+  gateway:
+    enabled: false
+
+  backend:
+    replicas: 0
+
+  read:
+    replicas: 0
+
+  write:
+    replicas: 0
+
+alloy:
+  controller:
+    type: daemonset
+
+  alloy:
+    configMap:
+      create: false
+
+jaeger:
+  provisionDataStore:
+    cassandra: false
+
+  storage:
+    type: memory
+
+  allInOne:
+    enabled: true
+
+  collector:
+    enabled: false
+
+  query:
+    enabled: false
