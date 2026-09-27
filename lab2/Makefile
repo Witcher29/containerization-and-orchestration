@@ -53,7 +53,7 @@ status: ## Показать состояние всего стенда
 	kubectl get pods,svc -n monitoring
 
 port-forward-api: ## API: localhost:8080
-	kubectl port-forward --address 0.0.0.0 svc/api-service 8080:80
+	kubectl port-forward --address 0.0.0.0 svc/api-service-api-service 8080:80
 
 port-forward-grafana: ## Grafana: localhost:3000
 	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-grafana 3000:80
