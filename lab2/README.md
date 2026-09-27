@@ -64,7 +64,25 @@ p95 Latency — histogram_quantile(0.95, sum(rate(http_request_duration_seconds_
 
 <img width="1859" height="1006" alt="image" src="https://github.com/user-attachments/assets/5c419c0b-eaf4-4d82-a91c-a195c3d771ea" />
 
-## Часть 4
+## Часть 2. Alertmanager и Karma
+
+Для сбора и просмотра логов в Kubernetes был развёрнут стек Loki + Alloy. Loki используется как хранилище логов, а Alloy работает как агент сбора логов на узлах кластера.
+
+Alloy был запущен в виде DaemonSet, поэтому его экземпляр работает на каждом узле Kubernetes-кластера. Он обнаруживает логи Kubernetes Pod'ов и отправляет их в Loki.
+
+Loki был настроен в режиме SingleBinary с хранением данных в файловой системе. В Grafana был добавлен Loki как дополнительный источник данных. После этого логи Pod'ов стали доступны непосредственно в интерфейсе Grafana через раздел Explore.
+
+Для проверки работы логирования был использован endpoint /fail приложения. При обращении к нему приложение возвращает ошибку и записывает соответствующее событие в JSON-лог.
+
+Например, для генерации нескольких ошибок использовалась команда:
+
+for i in {1..10}; do
+  curl -s http://127.0.0.1:8080/fail >/dev/null
+done
+
+<img width="688" height="373" alt="image" src="https://github.com/user-attachments/assets/b9448a85-bc4d-4c5b-9259-c7303d215d2b" />
+
+## Часть 3
 
 ### Трейсы
 
