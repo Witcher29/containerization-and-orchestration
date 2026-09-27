@@ -64,3 +64,27 @@ p95 Latency — histogram_quantile(0.95, sum(rate(http_request_duration_seconds_
 
 <img width="1859" height="1006" alt="image" src="https://github.com/user-attachments/assets/5c419c0b-eaf4-4d82-a91c-a195c3d771ea" />
 
+## Часть 4
+
+### Трейсы
+
+Сервис api инструментирован OpenTelemetry SDK — пакеты go.opentelemetry.io/otel/* подключены в go.mod. SDK создаёт root-спан на каждый входящий HTTP-запрос, а в отдельных обработчиках добавляются вложенные спаны.
+
+Спаны экспортируются по OTLP HTTP в Jaeger на адрес http://observability-jaeger.monitoring:4318. Из необычных проблем - в файле values.yaml endpoint задаётся без схемы http://, потому что SDK использует otlptracehttp.WithEndpoint, который ожидает только host:port и добавляет схему сам. Пример работы ниже:
+
+<img width="1852" height="1006" alt="image" src="https://github.com/user-attachments/assets/c8f32cd2-f701-43aa-b42a-4d1406c54345" />
+
+Вышеуказанные запросы:
+
+<img width="924" height="126" alt="image" src="https://github.com/user-attachments/assets/28aaa89c-d214-4f12-8eab-d5cd1f01a818" />
+
+В /slow создаётся вложенный спан slow-op через tracer.Start(ctx, "slow-op"). Он становится дочерним для root-спана GET /slow, потому что в контексте запроса уже лежит родительский спан. Внутри slow-op выполняется time.Sleep — имитация медленной операции. В Jaeger waterfall видно, что всё время запроса ушло именно в slow-op — так надо для более удобной локализации задержки.
+
+<img width="1857" height="831" alt="image" src="https://github.com/user-attachments/assets/56610ca5-2ad3-4654-bbe8-af9d1d603a94" />
+
+В /fail спан помечается как ошибочный: span.SetStatus(codes.Error, ...) и span.RecordError(...). В Jaeger он отображается красным, а в тегах спана видны error=true, otel.status_code=ERROR, http.status_code=500.
+
+<img width="1851" height="730" alt="image" src="https://github.com/user-attachments/assets/2cf2c4c7-8bd9-46ec-a5a2-6039b28041cb" />
+
+
+
