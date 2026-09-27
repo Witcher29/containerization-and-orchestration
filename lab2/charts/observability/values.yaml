@@ -39,6 +39,25 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
 
+    config:
+      global:
+        resolve_timeout: 5m
+
+      route:
+        group_by:
+          - alertname
+          - service
+        group_wait: 10s
+        group_interval: 30s
+        repeat_interval: 1h
+        receiver: webhook
+
+      receivers:
+        - name: webhook
+          webhook_configs:
+            - url: "https://webhook.site/b7c0af5b-a817-4526-a871-7078f157ec78"
+              send_resolved: true
+
 
 loki:
   deploymentMode: SingleBinary
