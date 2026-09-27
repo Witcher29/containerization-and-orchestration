@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -59,8 +60,17 @@ func init() {
 // ---------- OpenTelemetry ----------
 func initTracer() (*sdktrace.TracerProvider, error) {
 	ctx := context.Background()
+
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "localhost:4318"
+	}
+	// убираем схему, если она есть — otlptracehttp хочет host:port
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+
 	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithEndpoint(endpoint),
 		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
