@@ -55,7 +55,7 @@ kube-prometheus-stack:
       receivers:
         - name: webhook
           webhook_configs:
-            - url: "https://webhook.site/#!/edit/b7c0af5b-a817-4526-a871-7078f157ec78"
+            - url: "https://b7c0af5b-a817-4526-a871-7078f157ec78.webhook.site"
               send_resolved: true
 
 
