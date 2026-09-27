@@ -17,7 +17,7 @@ env:
   httpClientTimeout: "5s"
 
 otel:
-  endpoint: "jaeger:4318"
+  endpoint: "observability-jaeger.monitoring:4318"
 
 resources:
   requests:
