@@ -10,6 +10,15 @@ service:
   port: 80
   targetPort: 8080
 
+env:
+  port: "8080"
+  selfUrl: "http://api-service:80"
+  loadRequests: "20"
+  httpClientTimeout: "5s"
+
+otel:
+  endpoint: "jaeger:4318"
+
 resources:
   requests:
     cpu: 100m
@@ -17,6 +26,3 @@ resources:
   limits:
     cpu: 500m
     memory: 256Mi
-
-otel:
-  endpoint: "http://otel-collector:4318"
