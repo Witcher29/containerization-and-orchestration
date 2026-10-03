@@ -1,0 +1,55 @@
+commonLabels:
+  owner: team-shop
+  env: dev
+
+api:
+  replicaCount: 3
+  image:
+    repository: shop-api
+    tag: v1
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+    targetPort: 8080
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  env:
+    port: "8080"
+    healthFail: "false"
+
+worker:
+  replicaCount: 2
+  image:
+    repository: shop-worker
+    tag: v1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "300m"
+      memory: "128Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+postgres:
+  image:
+    repository: docker.io/library/postgres
+    tag: "16-alpine"
+  service:
+    port: 5432
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+  auth:
+    user: shop
+    password: shop
+    db: shop
