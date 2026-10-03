@@ -61,3 +61,66 @@ securityContext.privileged: true даёт контейнеру практиче�
 
 <img width="930" height="427" alt="image" src="https://github.com/user-attachments/assets/ab94c8c5-fcc3-4c73-a30e-45ef39989ede" />
 
+## Часть 2
+
+### Helm-чарт shop
+
+Чарт charts/shop/ разворачивает три сервиса: api, worker, postgres.
+В values.yaml заданы:
+- api.replicaCount: 3 — три реплики API;
+- worker.replicaCount: 2 — две реплики воркера;
+- образы shop-api:v1 и shop-worker:v1 (без префикса реестра — политика trusted-registries разрешает образы, начинающиеся с shop-);
+- ostgres.image.repository: docker.io/library/postgres, тег 16-alpine (с полным префиксом — политика разрешает docker.io/library/*);
+- resources.limits и resources.requests для всех контейнеров (требование require-resources);
+- общие лейблы owner: team-shop, env: dev (вместе с app на каждом поде — требование require-labels).
+
+Все три образа — с явными тегами (v1, 16-alpine), без privileged, из доверенных источников. Чарт проходит все пять политик Kyverno.
+
+При первом запуске shop-api и shop-worker имели несколько рестартов: приложение на старте блокируется на подключении к Postgres (до 60 секунд с ретраями), а liveness probe с initialDelaySeconds: 10 начинает бить /health раньше, чем HTTP-сервер поднимается. После того как Postgres инициализируется, поды становятся стабильными. Для устранения рестартов initialDelaySeconds liveness можно увеличить до 60.
+
+Проверка работы:
+
+<img width="926" height="209" alt="image" src="https://github.com/user-attachments/assets/476135b9-f70a-4379-8476-dfb0bfc788c1" />
+
+### Самовосстановление подов
+
+Удаление пода вручную приводит к его пересозданию. Deployment следит за количеством реплик и сам восстанавливает недостающие поды:
+
+<img width="922" height="228" alt="image" src="https://github.com/user-attachments/assets/f8a85b70-82eb-4194-b307-5f0f959c121d" />
+
+### Rolling update
+
+Изменение тега образа в values.yaml (или через --set api.image.tag=v2) и helm upgrade запускает rolling update.
+Kubernetes обновляет поды по одному: создаёт новый, ждёт Ready, только после этого удаляет один старый. Всё время обновления хотя бы 2 из 3 реплик api остаются доступными.:
+
+<img width="924" height="584" alt="image" src="https://github.com/user-attachments/assets/5681f50e-5b8d-4086-b69f-d3151adc1d7d" />
+
+Поэтому нет потери соеденения во время обновления:
+
+<img width="928" height="947" alt="image" src="https://github.com/user-attachments/assets/36bb894b-2a8a-4bd1-a568-080dba8c5abd" />
+
+История ревизий (4, а не 2, потому чо вручную пробовали менять ревизии перед обновлением):
+
+<img width="927" height="136" alt="image" src="https://github.com/user-attachments/assets/a64ff88d-8f6f-4d1b-ab5e-2ba35b2d1805" />
+
+Смена ревизий:
+
+<img width="924" height="584" alt="image" src="https://github.com/user-attachments/assets/47af9205-1354-48fc-9f3d-8d7c51c436ce" />
+
+### Сломанная версия и откат
+
+Развёрнута намеренно неисправная версия, после чего выполнен откат к исправной и проверена работа сервиса:
+
+<img width="927" height="298" alt="image" src="https://github.com/user-attachments/assets/fff420bc-2ea5-42ef-8296-f1326042ef58" />
+
+При HEALTH_FAIL=true эндпоинт /health возвращает 500. Что происходит:
+- Readiness probe новых подов не проходит → новый под не становится Ready.
+- Liveness probe получает 500 → Kubernetes перезапускает контейнер → под уходит в CrashLoopBackOff.
+- Rolling update не может удалить ни один старый под: новый должен стать Ready, а он не становится. Все три старых пода остаются 1/1 Running и продолжают обслуживать трафик.
+- Service направляет запросы только на Ready-endpoints — на сломанные поды трафик не идёт.
+- Через 5 минут helm upgrade падает с context deadline exceeded.
+
+Во время helm upgrade создался 4-й под, который постоянно рестартается, но первые три не удалились:
+
+<img width="804" height="208" alt="image" src="https://github.com/user-attachments/assets/25e4a44f-7479-49b9-808f-1bdce9704471" />
+
