@@ -2,7 +2,7 @@ CLUSTER_NAME := observability-demo
 
 API_IMAGE    := shop-api
 WORKER_IMAGE := shop-worker
-TAG          := latest
+TAG          := v1
 
 .PHONY: help cluster-up cluster-down \
         build build-api build-worker \
