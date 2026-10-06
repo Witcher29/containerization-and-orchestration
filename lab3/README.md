@@ -124,3 +124,51 @@ Kubernetes обновляет поды по одному: создаёт нов�
 
 <img width="804" height="208" alt="image" src="https://github.com/user-attachments/assets/25e4a44f-7479-49b9-808f-1bdce9704471" />
 
+## Часть 3
+
+В ходе проверки был удалён Pod shop-postgres-1. CloudNativePG обнаружил, что фактическое количество экземпляров стало меньше заданного в spec.instances: 1, и восстановил PostgreSQL Pod. После завершения восстановления кластер вернулся в состояние Ready.
+
+<img width="974" height="573" alt="image" src="https://github.com/user-attachments/assets/804c1e25-5be7-4a91-885a-3df670520378" />
+
+### Spec и status объекта PostgreSQL Cluster
+CloudNativePG использует Kubernetes Custom Resource Cluster для описания PostgreSQL-кластера.
+Поле spec описывает желаемое состояние кластера. В нашем случае оно задаёт один экземпляр PostgreSQL (instances: 1), параметры ресурсов CPU и памяти, размер persistent storage (1Gi), параметры первоначальной инициализации базы shop и PostgreSQL image.
+
+<img width="499" height="123" alt="image" src="https://github.com/user-attachments/assets/fe4e0338-ac31-4af6-a69b-a86c03e8448d" />
+<img width="752" height="248" alt="image" src="https://github.com/user-attachments/assets/2f8113e9-17a9-4cec-a092-79b8e8e45bb9" />
+
+Поле status описывает фактическое состояние, которое наблюдает CloudNativePG Operator. В нём содержится информация о текущем primary (shop-postgres-1), количестве экземпляров, PVC, созданных сервисах (shop-postgres-rw, shop-postgres-rw/read services), состоянии сертификатов и текущей фазе кластера.
+
+<img width="974" height="247" alt="image" src="https://github.com/user-attachments/assets/cdaa9a32-f738-4f74-a465-206c2650ad40" />
+
+Таким образом:
+  -	spec — что пользователь хочет получить;
+  -	status — что оператор фактически наблюдает;
+  -	CloudNativePG постоянно сравнивает фактическое состояние с желаемым и выполняет reconciliation.
+    
+### Отличие оператора от controller-manager
+Оператор — это специализированный контроллер Kubernetes, который управляет конкретным типом ресурсов и реализует дополнительную предметную логику.
+В данном случае оператор CloudNativePG Operator имеет следующие преимущества над контроллером:
+  -	Знает специфику PostgreSQL — CloudNativePG Operator понимает, как правильно запускать, настраивать и восстанавливать PostgreSQL, а обычный controller-manager работает с общими объектами Kubernetes.
+  -	Автоматически управляет базой — оператор может сам создавать PostgreSQL Pod, PVC, Services, выполнять recovery и поддерживать нужное количество экземпляров.
+  -	Умеет выполнять специальные операции — например, управлять primary/replica, репликацией, backup и failover PostgreSQL. Обычный controller-manager такой логики для базы данных не имеет.
+
+## Часть 4
+
+### Фиксация текущего состояния
+Перед проведением эксперимента зафиксировали текущее состояние Kubernetes-кластера и убедились, что все основные компоненты работают штатно. API, worker и PostgreSQL были запущены, а Kubernetes API Server был доступен для выполнения команд управления кластером. Здесь можно увидеть ip-адреса сервисов, к которым будем обращаться напрямую после остановки control plane.
+
+<img width="974" height="222" alt="image" src="https://github.com/user-attachments/assets/94e57d5f-fa2d-4ae1-84eb-367e6c449e6c" />
+
+### Остановка и восстановление control plane
+Остановили контейнер control plane, в результате чего Kubernetes API Server стал недоступен, а команды управления кластером перестали выполняться. После этого сразу запустили control plane обратно и повторно выполнили Kubernetes-команды. Увидели, что после восстановления control plane команды снова проходят успешно, а кластер возвращается в рабочее состояние.
+
+<img width="974" height="118" alt="image" src="https://github.com/user-attachments/assets/3ca3fb68-4426-4235-bcb7-9c4de8ce5774" />
+<img width="974" height="166" alt="image" src="https://github.com/user-attachments/assets/23d08663-dd9b-4527-be8b-cd6ee3692f6f" />
+
+### Работа API во время остановки control plane
+Во время остановки control plane проверили непосредственно работу api-сервиса, отправив HTTP-запросы к его endpoint. Несмотря на недоступность Kubernetes API Server, уже запущенный API-сервис продолжал отвечать на запросы. Это показывает, что отказ control plane не приводит к немедленной остановке уже работающих workload'ов в кластере.
+
+<img width="974" height="138" alt="image" src="https://github.com/user-attachments/assets/493d32c4-b50f-488d-a0be-81aabfa00de8" />
+
+
