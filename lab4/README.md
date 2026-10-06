@@ -6,6 +6,10 @@
 
 <img width="822" height="128" alt="Screenshot from 2026-10-06 20-54-27" src="https://github.com/user-attachments/assets/deb18140-d336-4249-b174-73daf49c3c47" />
 
+Проверим, что контейнер заполняет память с помощью утилиты `docker stats`:
+
+<img width="1015" height="508" alt="Screenshot from 2026-10-06 20-55-31" src="https://github.com/user-attachments/assets/1687502b-59ed-44a9-bc41-b87190582ff7" />
+
 
 ## Часть 1 — Политики кластера (Kyverno)
 
