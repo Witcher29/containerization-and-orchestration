@@ -21,3 +21,7 @@ dependencies:
   - name: jaeger
     version: ">=3.0.0 <5.0.0"
     repository: https://jaegertracing.github.io/helm-charts
+
+  - name: karma
+    version: ">=0.1.0"
+    repository: https://wiremind.github.io/wiremind-helm-charts

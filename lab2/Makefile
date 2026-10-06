@@ -33,6 +33,8 @@ deploy-api: image-load ## Установить API через Helm
 	  --timeout 5m
 
 deploy-observability: ## Установить observability stack через Helm
+	helm repo add wiremind https://wiremind.github.io/wiremind-helm-charts --force-update
+	helm repo update
 	helm dependency update ./charts/observability
 	helm upgrade --install observability ./charts/observability \
 	  --namespace monitoring \
@@ -53,7 +55,7 @@ status: ## Показать состояние всего стенда
 	kubectl get pods,svc -n monitoring
 
 port-forward-api: ## API: localhost:8080
-	kubectl port-forward --address 0.0.0.0 svc/api-service 8080:80
+	kubectl port-forward --address 0.0.0.0 svc/api-service-api-service 8080:80
 
 port-forward-grafana: ## Grafana: localhost:3000
 	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-grafana 3000:80
@@ -66,6 +68,8 @@ port-forward-jaeger: ## Jaeger: localhost:16686
 
 port-forward-alertmanager: ## Alertmanager: localhost:9093
 	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-kube-prometh-alertmanager 9093:9093
+port-forward-karma: ## Karma: localhost:8081
+	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-karma 8081:80
 
 clean: ## Удалить весь Kind-кластер
 	./cluster/delete.sh

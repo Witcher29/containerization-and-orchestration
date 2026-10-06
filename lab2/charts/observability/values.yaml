@@ -39,6 +39,25 @@ kube-prometheus-stack:
   alertmanager:
     enabled: true
 
+    config:
+      global:
+        resolve_timeout: 5m
+
+      route:
+        group_by:
+          - alertname
+          - service
+        group_wait: 10s
+        group_interval: 30s
+        repeat_interval: 1h
+        receiver: webhook
+
+      receivers:
+        - name: webhook
+          webhook_configs:
+            - url: "https://b7c0af5b-a817-4526-a871-7078f157ec78.webhook.site"
+              send_resolved: true
+
 
 loki:
   deploymentMode: SingleBinary
@@ -152,3 +171,20 @@ jaeger:
 
   query:
     enabled: false
+
+  karma:
+    configMap:
+      enabled: true
+      rawConfig:
+        alertmanager:
+          interval: 30s
+          servers:
+            - name: alertmanager
+              uri: http://observability-kube-prometh-alertmanager.monitoring.svc:9093
+              timeout: 10s
+              proxy: true
+
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: http
