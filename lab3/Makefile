@@ -5,6 +5,7 @@ WORKER_IMAGE := shop-worker
 TAG          := v1
 
 .PHONY: help cluster-up cluster-down \
+        install-operator \
         build build-api build-worker \
         image-load image-load-api image-load-worker \
         deploy deploy-shop \
@@ -30,6 +31,13 @@ build-api: ## Собрать образ shop-api
 build-worker: ## Собрать образ shop-worker
 	docker build -t $(WORKER_IMAGE):$(TAG) ./service/worker
 
+install-operator: ## Установить CloudNativePG operator
+	kubectl apply --server-side -f operator/cloudnative-pg.yaml
+	kubectl wait --for=condition=Available \
+	  deployment/cnpg-controller-manager \
+	  -n cnpg-system \
+	  --timeout=120s
+
 image-load: image-load-api image-load-worker ## Загрузить оба образа в kind
 
 image-load-api: build-api ## Загрузить shop-api в kind
@@ -48,7 +56,7 @@ deploy-shop: image-load ## Установить чарт shop через Helm
 	  --wait \
 	  --timeout 5m
 
-deploy: cluster-up deploy-shop ## Развернуть shop
+deploy: cluster-up install-operator deploy-shop ## Развернуть shop
 
 status: ## Показать состояние всего стенда
 	@echo "=== Kind nodes ==="
