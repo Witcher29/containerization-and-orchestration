@@ -16,6 +16,19 @@ spec:
         app: shop-api
         {{- toYaml .Values.commonLabels | nindent 8 }}
     spec:
+        {{- if eq .Values.api.scheduling.strategy "topologySpreadConstraints" }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.api.scheduling.topologySpreadConstraints.maxSkew }}
+          topologyKey: {{ .Values.api.scheduling.topologySpreadConstraints.topologyKey }}
+          whenUnsatisfiable: {{ .Values.api.scheduling.topologySpreadConstraints.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app: shop-api
+      {{- else if eq .Values.api.scheduling.strategy "podAntiAffinity" }}
+      affinity:
+        podAntiAffinity:
+          {{- toYaml .Values.api.scheduling.podAntiAffinity | nindent 10 }}
+      {{- end }}
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
