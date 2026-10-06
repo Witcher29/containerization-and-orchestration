@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "shop.fullname" . }}-postgres-init
+  labels:
+    app: shop-postgres-init
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: shop-postgres-init
+        {{- toYaml .Values.commonLabels | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: postgres-init
+          image: docker.io/library/postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGPASSWORD
+              value: {{ .Values.postgres.auth.password | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until pg_isready \
+                -h {{ include "shop.fullname" . }}-postgres-rw \
+                -p {{ .Values.postgres.service.port }} \
+                -U {{ .Values.postgres.auth.user }} \
+                -d {{ .Values.postgres.auth.db }}; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+
+              psql \
+                -h {{ include "shop.fullname" . }}-postgres-rw \
+                -p {{ .Values.postgres.service.port }} \
+                -U {{ .Values.postgres.auth.user }} \
+                -d {{ .Values.postgres.auth.db }} \
+                -c "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, status TEXT NOT NULL);"
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
