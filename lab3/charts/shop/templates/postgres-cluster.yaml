@@ -1,0 +1,33 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "shop.fullname" . }}-postgres
+  labels:
+    app: shop-postgres
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+
+spec:
+  instances: 1
+
+  inheritedMetadata:
+    labels:
+      app: shop-postgres
+      {{- toYaml .Values.commonLabels | nindent 6 }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.auth.db }}
+      owner: {{ .Values.postgres.auth.user }}
+      secret:
+        name: {{ include "shop.fullname" . }}-postgres-auth
+
+  storage:
+    size: 1Gi
+
+  resources:
+    limits:
+      cpu: {{ .Values.postgres.resources.limits.cpu | quote }}
+      memory: {{ .Values.postgres.resources.limits.memory | quote }}
+    requests:
+      cpu: {{ .Values.postgres.resources.requests.cpu | quote }}
+      memory: {{ .Values.postgres.resources.requests.memory | quote }}
