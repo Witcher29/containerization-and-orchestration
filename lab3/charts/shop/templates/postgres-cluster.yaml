@@ -20,6 +20,12 @@ spec:
       owner: {{ .Values.postgres.auth.user }}
       secret:
         name: {{ include "shop.fullname" . }}-postgres-auth
+      postInitSQL:
+        - |
+          CREATE TABLE IF NOT EXISTS orders (
+            id SERIAL PRIMARY KEY,
+            status TEXT NOT NULL
+          );
 
   storage:
     size: 1Gi
