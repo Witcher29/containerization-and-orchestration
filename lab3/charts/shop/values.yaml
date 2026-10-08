@@ -21,6 +21,8 @@ api:
   env:
     port: "8080"
     healthFail: "false"
+  serviceMonitor:
+    enabled: true
 
 worker:
   replicaCount: 2

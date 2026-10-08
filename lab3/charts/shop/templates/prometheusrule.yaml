@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-alerts
+  labels:
+    release: monitoring
+    app: shop-api
+    owner: {{ .Values.commonLabels.owner | quote }}
+    env: {{ .Values.commonLabels.env | quote }}
+spec:
+  groups:
+    - name: shop-api
+      interval: 15s
+      rules:
+        - alert: ShopApiHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job=~".*shop.*",code=~"5.."}[1m])) > 0
+          for: 10s
+          labels:
+            severity: warning
+            service: shop-api
+          annotations:
+            summary: "Shop API returned HTTP 5xx errors"
+            description: "At least one HTTP 5xx response was observed. Check API logs and database connectivity."
+
+        - alert: ShopApiHighLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket{job=~".*shop.*"}[1m])
+              )
+            ) > 0.1
+          for: 10s
+          labels:
+            severity: warning
+            service: shop-api
+          annotations:
+            summary: "Shop API latency is above 100 ms"
+            description: "The 95th percentile of request latency exceeded 100 ms. Check application performance and PostgreSQL queries."
+
+        - alert: ShopApiDown
+          expr: |
+            up{job=~".*shop.*"} == 0
+          for: 10s
+          labels:
+            severity: critical
+            service: shop-api
+          annotations:
+            summary: "Shop API metrics endpoint is unavailable"
+            description: "Prometheus cannot scrape the API metrics endpoint. Check the Pod, Service, and /metrics endpoint."
