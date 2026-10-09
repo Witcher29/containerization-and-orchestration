@@ -22,7 +22,7 @@ spec:
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           env:
             - name: POSTGRES_HOST
-              value: {{ include "shop.fullname" . }}-postgres
+              value: {{ include "shop.fullname" . }}-postgres-rw
             - name: POSTGRES_PORT
               value: {{ .Values.postgres.service.port | quote }}
             - name: POSTGRES_USER

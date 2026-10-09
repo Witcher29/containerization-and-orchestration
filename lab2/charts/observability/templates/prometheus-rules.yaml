@@ -1,0 +1,54 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-service-critical
+  labels:
+    release: observability
+spec:
+  groups:
+    - name: api-service-critical
+      rules:
+        - alert: ApiServiceHighErrorRate
+          expr: |
+            (
+              sum(rate(http_errors_total{job="api-service"}[2m]))
+              /
+              clamp_min(
+                sum(rate(http_requests_total{job="api-service"}[2m])),
+                0.001
+              )
+            ) > 0.20
+          for: 2m
+          labels:
+            severity: critical
+            service: api-service
+          annotations:
+            summary: "API: высокая доля ошибок"
+            description: "Более 20% запросов API завершаются ошибкой в течение 2 минут."
+
+        - alert: ApiServiceHighP95Latency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket{job="api-service"}[5m])
+              )
+            ) > 1
+          for: 2m
+          labels:
+            severity: critical
+            service: api-service
+          annotations:
+            summary: "API: высокий p95 latency"
+            description: "p95 времени ответа API выше 1 секунды в течение 2 минут."
+
+        - alert: ApiServiceDown
+          expr: |
+            up{job="api-service"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: api-service
+          annotations:
+            summary: "API недоступен"
+            description: "Prometheus не может получить метрики api-service более 1 минуты."

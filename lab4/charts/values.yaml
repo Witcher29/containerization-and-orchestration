@@ -1,0 +1,154 @@
+kube-prometheus-stack:
+  grafana:
+    enabled: true
+
+    adminUser: admin
+    adminPassword: admin
+
+    service:
+      type: ClusterIP
+
+    persistence:
+      enabled: false
+
+    sidecar:
+      datasources:
+        enabled: true
+
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://observability-loki:3100
+        isDefault: false
+
+  prometheus:
+    prometheusSpec:
+      retention: 2d
+      serviceMonitorNamespaceSelector: { }
+      serviceMonitorSelector:
+        matchLabels:
+          release: observability
+
+      additionalScrapeConfigs:
+        - job_name: api-service
+          static_configs:
+            - targets:
+                - api-service-api-service.default.svc.cluster.local:80
+
+  alertmanager:
+    enabled: true
+
+
+loki:
+  deploymentMode: SingleBinary
+
+  loki:
+    auth_enabled: false
+
+    commonConfig:
+      replication_factor: 1
+
+    schemaConfig:
+      configs:
+        - from: "2024-04-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+
+    storage:
+      type: filesystem
+
+  singleBinary:
+    replicas: 1
+
+  gateway:
+    enabled: false
+
+  backend:
+    replicas: 0
+
+  read:
+    replicas: 0
+
+  write:
+    replicas: 0
+
+  chunksCache:
+    enabled: false
+
+  resultsCache:
+    enabled: false
+
+
+alloy:
+  controller:
+    type: daemonset
+
+  alloy:
+    configMap:
+      create: true
+      content: |
+        logging {
+          level  = "info"
+          format = "logfmt"
+        }
+
+        discovery.kubernetes "pods" {
+          role = "pod"
+        }
+
+        discovery.relabel "pod_logs" {
+          targets = discovery.kubernetes.pods.targets
+
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+            target_label  = "app"
+          }
+        }
+
+        loki.source.kubernetes "pod_logs" {
+          targets    = discovery.relabel.pod_logs.output
+          forward_to = [loki.write.default.receiver]
+        }
+
+        loki.write "default" {
+          endpoint {
+            url = "http://observability-loki:3100/loki/api/v1/push"
+          }
+        }
+
+
+jaeger:
+  provisionDataStore:
+    cassandra: false
+
+  storage:
+    type: memory
+
+  allInOne:
+    enabled: true
+
+  collector:
+    enabled: false
+
+  query:
+    enabled: false

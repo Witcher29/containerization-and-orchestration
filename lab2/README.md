@@ -64,7 +64,7 @@ p95 Latency — histogram_quantile(0.95, sum(rate(http_request_duration_seconds_
 
 <img width="1859" height="1006" alt="image" src="https://github.com/user-attachments/assets/5c419c0b-eaf4-4d82-a91c-a195c3d771ea" />
 
-## Часть 2. Alertmanager и Karma
+## Часть 2. Логи
 
 Для сбора и просмотра логов в Kubernetes был развёрнут стек Loki + Alloy. Loki используется как хранилище логов, а Alloy работает как агент сбора логов на узлах кластера.
 
@@ -170,6 +170,4 @@ ApiServiceHighP95Latency
 
 
 Karma оказалась удобнее стандартного интерфейса Alertmanager для одновременного просмотра нескольких алертов, поскольку позволяет быстро отфильтровать нужные события и видеть их состояние в одном окне.
-
-
 

@@ -1,0 +1,19 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-labels
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: |
+        has(object.metadata.labels) &&
+        'app' in object.metadata.labels &&
+        'owner' in object.metadata.labels &&
+        'env' in object.metadata.labels
+      message: "pods must have labels: app, owner, env"
