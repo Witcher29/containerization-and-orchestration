@@ -3,7 +3,7 @@ kind: PrometheusRule
 metadata:
   name: {{ include "shop.fullname" . }}-alerts
   labels:
-    release: monitoring
+    release: observability
     app: shop-api
     owner: {{ .Values.commonLabels.owner | quote }}
     env: {{ .Values.commonLabels.env | quote }}
