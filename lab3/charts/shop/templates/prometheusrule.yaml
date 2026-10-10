@@ -14,7 +14,7 @@ spec:
       rules:
         - alert: ShopApiHighErrorRate
           expr: |
-            sum(rate(http_requests_total{job=~".*shop.*",code=~"5.."}[1m])) > 0
+            sum(rate(http_requests_total{job=~"shop-api",code=~"5.."}[1m])) > 0
           for: 10s
           labels:
             severity: warning
@@ -28,7 +28,7 @@ spec:
             histogram_quantile(
               0.95,
               sum by (le) (
-                rate(http_request_duration_seconds_bucket{job=~".*shop.*"}[1m])
+                rate(http_request_duration_seconds_bucket{job=~"shop-api"}[1m])
               )
             ) > 0.1
           for: 10s
@@ -41,7 +41,7 @@ spec:
 
         - alert: ShopApiDown
           expr: |
-            up{job=~".*shop.*"} == 0
+            up{job=~"shop-api"} == 0
           for: 10s
           labels:
             severity: critical

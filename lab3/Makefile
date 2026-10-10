@@ -1,81 +1,157 @@
-CLUSTER_NAME := observability-demo
-API_IMAGE := shop-api
-WORKER_IMAGE := shop-worker
-TAG := v1
+SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
 
-OBSERVABILITY_CHART := ./charts
-SHOP_CHART := ./charts/shop
+# Kubernetes / Kind
+CLUSTER_NAME ?= observability-demo
 
-.PHONY: help cluster-up cluster-down \
-	build-api build-worker build \
-	install-operator load-images \
-	observability-deps deploy-observability \
-	deploy-shop deploy status clean \
-	port-forward-api port-forward-grafana \
-	port-forward-prometheus port-forward-alertmanager \
-	port-forward-jaeger
+# Images
+API_IMAGE ?= shop-api
+WORKER_IMAGE ?= shop-worker
+TAG ?= v1
 
-help: ## Показать список команд
-	@grep -E '^[a-zA-Z0-9_-]+:.##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.## "}; {printf "  %-28s %s\n", $$1, $$2}'
+# Namespaces and Helm releases
+APP_NAMESPACE ?= default
+MONITORING_NAMESPACE ?= monitoring
 
-cluster-up: ## Создать Kind-кластер
-	./cluster/create.sh
+CNPG_RELEASE ?= cnpg
+CNPG_NAMESPACE ?= cnpg-system
 
-cluster-down: ## Удалить Kind-кластер
-	./cluster/delete.sh
+PROMETHEUS_RELEASE ?= monitoring
+KARMA_RELEASE ?= karma
 
-build-api: ## Собрать образ API
+# Paths
+SHOP_CHART := charts/shop
+OBSERVABILITY_DIR := charts/observability
+PROMETHEUS_VALUES := $(OBSERVABILITY_DIR)/values/kube-prometheus-stack.yaml
+KARMA_VALUES := $(OBSERVABILITY_DIR)/values/karma.yaml
+
+.PHONY: help check-tools check-cluster \
+        build-api build-worker build \
+        image-load-api image-load-worker image-load \
+        install-operator deploy-shop \
+        install-prometheus wait-monitoring-crds \
+        install-karma verify-monitoring deploy-all
+
+help:
+	@echo "Targets:"
+	@echo "  make build             Build API and worker images"
+	@echo "  make image-load        Load images into Kind"
+	@echo "  make install-operator  Install CloudNativePG Operator"
+	@echo "  make install-prometheus Install kube-prometheus-stack"
+	@echo "  make deploy-shop       Deploy the shop Helm chart"
+	@echo "  make install-karma     Install Karma"
+	@echo "  make deploy-all        Install the complete lab stack"
+
+check-tools:
+	@command -v docker >/dev/null || { echo "ERROR: docker not found"; exit 1; }
+	@command -v kind >/dev/null || { echo "ERROR: kind not found"; exit 1; }
+	@command -v kubectl >/dev/null || { echo "ERROR: kubectl not found"; exit 1; }
+	@command -v helm >/dev/null || { echo "ERROR: helm not found"; exit 1; }
+
+check-cluster: check-tools
+	@kind get clusters | grep -Fxq "$(CLUSTER_NAME)" || { \
+		echo "ERROR: Kind cluster '$(CLUSTER_NAME)' does not exist."; \
+		echo "Create it first using the project's cluster configuration."; \
+		exit 1; \
+	}
+	@kubectl cluster-info >/dev/null
+	@echo "Kind cluster $(CLUSTER_NAME) is reachable."
+
+build-api:
 	docker build -t $(API_IMAGE):$(TAG) ./service/api
 
-build-worker: ## Собрать образ worker
+build-worker:
 	docker build -t $(WORKER_IMAGE):$(TAG) ./service/worker
 
-build: build-api build-worker ## Собрать образы
+build: build-api build-worker
 
-install-operator: ## Установить CloudNativePG
-	helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts
-	helm repo update
-	helm upgrade --install cnpg cloudnative-pg/cloudnative-pg --namespace cnpg-system --create-namespace --wait --timeout 5m
-
-load-images: build ## Загрузить образы в Kind
+image-load-api:
 	kind load docker-image $(API_IMAGE):$(TAG) --name $(CLUSTER_NAME)
+
+image-load-worker:
 	kind load docker-image $(WORKER_IMAGE):$(TAG) --name $(CLUSTER_NAME)
 
-observability-deps: ## Скачать зависимости observability
-	helm dependency update $(OBSERVABILITY_CHART)
+image-load: image-load-api image-load-worker
 
-deploy-observability: observability-deps ## Установить observability
-	helm upgrade --install observability $(OBSERVABILITY_CHART) --namespace monitoring --create-namespace --wait --timeout 10m
+install-operator: check-cluster
+	helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts
+	helm repo update
+	kubectl create namespace $(CNPG_NAMESPACE) \
+		--dry-run=client -o yaml | kubectl apply -f -
+	helm upgrade --install $(CNPG_RELEASE) cloudnative-pg/cloudnative-pg \
+		--namespace $(CNPG_NAMESPACE) \
+		--wait --timeout 5m
+	@echo "Waiting for CloudNativePG CRD..."
+	@for i in $$(seq 1 60); do \
+		kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 && break; \
+		sleep 2; \
+	done
+	@kubectl get crd clusters.postgresql.cnpg.io >/dev/null
+	@echo "CloudNativePG CRD is available."
 
-deploy-shop: load-images ## Установить приложение
-	helm upgrade --install shop $(SHOP_CHART) --namespace default --set api.image.repository=$(API_IMAGE) --set api.image.tag=$(TAG) --set worker.image.repository=$(WORKER_IMAGE) --set worker.image.tag=$(TAG) --wait --timeout 5m
+install-prometheus: check-cluster
+	@test -f "$(PROMETHEUS_VALUES)" || { \
+		echo "ERROR: missing $(PROMETHEUS_VALUES)"; exit 1; \
+	}
+	helm repo add prometheus-community \
+		https://prometheus-community.github.io/helm-charts
+	helm repo update
+	kubectl create namespace $(MONITORING_NAMESPACE) \
+		--dry-run=client -o yaml | kubectl apply -f -
+	helm upgrade --install $(PROMETHEUS_RELEASE) \
+		prometheus-community/kube-prometheus-stack \
+		--namespace $(MONITORING_NAMESPACE) \
+		-f $(PROMETHEUS_VALUES) \
+		--wait --timeout 10m
+	$(MAKE) wait-monitoring-crds
 
-deploy: ## Развернуть весь стек
-	$(MAKE) cluster-up
-	$(MAKE) install-operator
-	$(MAKE) deploy-observability
-	$(MAKE) deploy-shop
+wait-monitoring-crds:
+	@echo "Waiting for ServiceMonitor and PrometheusRule CRDs..."
+	@for crd in servicemonitors.monitoring.coreos.com prometheusrules.monitoring.coreos.com; do \
+		for i in $$(seq 1 60); do \
+			kubectl get crd "$$crd" >/dev/null 2>&1 && break; \
+			sleep 2; \
+		done; \
+		kubectl get crd "$$crd" >/dev/null || { \
+			echo "ERROR: CRD $$crd was not installed"; exit 1; \
+		}; \
+	done
+	@echo "Monitoring CRDs are available."
 
-status: ## Показать состояние Kubernetes
-	kubectl get nodes
-	kubectl get pods -A
-	kubectl get svc -A
+deploy-shop: check-cluster wait-monitoring-crds
+	helm upgrade --install shop $(SHOP_CHART) \
+		--namespace $(APP_NAMESPACE) \
+		--create-namespace \
+		--set api.image.repository=$(API_IMAGE) \
+		--set api.image.tag=$(TAG) \
+		--set worker.image.repository=$(WORKER_IMAGE) \
+		--set worker.image.tag=$(TAG) \
+		--wait --timeout 10m
 
-port-forward-api: ## API на порту 8080
-	kubectl port-forward --address 0.0.0.0 svc/shop-api 8080:80 -n default
+install-karma: check-cluster
+	@test -f "$(KARMA_VALUES)" || { \
+		echo "ERROR: missing $(KARMA_VALUES)"; \
+		echo "Create the Karma values file before installing Karma."; \
+		exit 1; \
+	}
+	helm repo add wiremind https://wiremind.github.io/wiremind-helm-charts
+	helm repo update
+	helm upgrade --install $(KARMA_RELEASE) wiremind/karma \
+		--namespace $(MONITORING_NAMESPACE) \
+		-f $(KARMA_VALUES) \
+		--wait --timeout 5m
 
-port-forward-grafana: ## Grafana на порту 3000
-	kubectl port-forward --address 0.0.0.0 svc/observability-grafana 3000:80 -n monitoring
+verify-monitoring:
+	@echo "=== Kubernetes resources ==="
+	kubectl get pods -n $(MONITORING_NAMESPACE)
+	kubectl get servicemonitor -A
+	kubectl get prometheusrule -A
+	@echo "=== Shop resources ==="
+	kubectl get pods -n $(APP_NAMESPACE)
+	kubectl get svc shop-api -n $(APP_NAMESPACE)
+	kubectl get endpoints shop-api -n $(APP_NAMESPACE)
 
-port-forward-prometheus: ## Prometheus на порту 9090
-	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometh-prometheus 9090:9090 -n monitoring
-
-port-forward-alertmanager: ## Alertmanager на порту 9093
-	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometheus-alertmanager 9093:9093 -n monitoring
-
-port-forward-jaeger: ## Jaeger на порту 16686
-	kubectl port-forward --address 0.0.0.0 svc/observability-jaeger 16686:16686 -n monitoring
-
-clean: ## Удалить Helm-релизы
-	-helm uninstall shop -n default
-	-helm uninstall observability -n monitoring
+deploy-all: check-cluster install-operator build image-load install-prometheus deploy-shop install-karma
+	$(MAKE) verify-monitoring
+	@echo "Deployment completed."
+	@echo "Prometheus: kubectl port-forward -n $(MONITORING_NAMESPACE) svc/$(PROMETHEUS_RELEASE)-kube-prometheus-prometheus 9090:9090"

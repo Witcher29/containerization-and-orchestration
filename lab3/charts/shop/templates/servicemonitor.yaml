@@ -9,6 +9,7 @@ metadata:
     owner: {{ .Values.commonLabels.owner | quote }}
     env: {{ .Values.commonLabels.env | quote }}
 spec:
+  jobLabel: app
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
