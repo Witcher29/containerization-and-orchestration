@@ -62,13 +62,13 @@ status: ## Показать состояние Kubernetes
 	kubectl get svc -A
 
 port-forward-api: ## API на порту 8080
-	kubectl port-forward --address 0.0.0.0 svc/api-service 8080:80 -n default
+	kubectl port-forward --address 0.0.0.0 svc/shop-api 8080:80 -n default
 
 port-forward-grafana: ## Grafana на порту 3000
 	kubectl port-forward --address 0.0.0.0 svc/observability-grafana 3000:80 -n monitoring
 
 port-forward-prometheus: ## Prometheus на порту 9090
-	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometheus-prometheus 9090:9090 -n monitoring
+	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometh-prometheus 9090:9090 -n monitoring
 
 port-forward-alertmanager: ## Alertmanager на порту 9093
 	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometheus-alertmanager 9093:9093 -n monitoring
