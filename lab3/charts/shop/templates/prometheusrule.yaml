@@ -9,17 +9,18 @@ metadata:
     env: {{ .Values.commonLabels.env | quote }}
 spec:
   groups:
-    - name: shop-api
+    - name: ShopApiHighErrorRate
       interval: 15s
       rules:
         - alert: ShopMonitoringTest
-        - expr: vector(1)
+        - expr: |
+            vector(1)
         - labels:
-        - severity: warning
-        - service: shop-api
+            severity: warning
+            service: shop-api
         - annotations:
-        - summary: "Test alert for monitoring pipeline"
-        - description: "Temporary alert to verify Prometheus, Alertmanager and Karma."
+            summary: "Shop API returned HTTP 5xx errors"
+            description: "At least one HTTP 5xx response was observed. Check API logs and database connectivity"
 
         - alert: ShopApiHighErrorRate
           expr: |
