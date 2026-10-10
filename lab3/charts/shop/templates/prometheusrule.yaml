@@ -12,17 +12,17 @@ spec:
     - name: ShopApiHighErrorRate
       interval: 15s
       rules:
-        - alert: ShopMonitoringTest
-        - expr: |
-            vector(1)
-        - labels:
+        - alert: ShopApiHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job=~"shop-api"}[1m])) > 0
+          labels:
             severity: warning
             service: shop-api
-        - annotations:
+          annotations:
             summary: "Shop API returned HTTP 5xx errors"
-            description: "At least one HTTP 5xx response was observed. Check API logs and database connectivity"
+            description: "At least one HTTP 5xx response was observed. Check API logs and database connectivity."
 
-        - alert: ShopApiHighErrorRate
+        - alert: ShopApiHighErrorRate2
           expr: |
             sum(rate(http_requests_total{job=~"shop-api",code=~"5.."}[1m])) > 0
           for: 10s
