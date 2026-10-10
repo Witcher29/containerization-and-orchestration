@@ -1,87 +1,97 @@
 CLUSTER_NAME := observability-demo
 
-API_IMAGE    := shop-api
+API_IMAGE := shop-api
 WORKER_IMAGE := shop-worker
-TAG          := v1
+TAG := v1
+
+OBSERVABILITY_CHART := ./charts/observability
+SHOP_CHART := ./charts/shop
 
 .PHONY: help cluster-up cluster-down \
-        install-operator \
-        build build-api build-worker \
-        image-load image-load-api image-load-worker \
-        deploy deploy-shop \
-        port-forward-api port-forward-grafana port-forward-prometheus \
-        port-forward-jaeger port-forward-alertmanager \
-        status clean
+	build-api build-worker build \
+	install-operator load-images \
+	observability-deps deploy-observability \
+	deploy-shop deploy status clean \
+	port-forward-api port-forward-grafana \
+	port-forward-prometheus port-forward-alertmanager \
+	port-forward-jaeger
 
-help: ## Показать доступные команды
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-	  awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}'
+help: ## Показать список доступных команд
+	@grep -E '^[a-zA-Z0-9_-]+:.##' $(MAKEFILE_LIST) |
+	awk 'BEGIN {FS = ":.## "}; {printf "  %-28s %s\n", $$1, $$2}'
 
 cluster-up: ## Создать Kind-кластер
-	./cluster/create.sh
+	./scripts/cluster-up.sh
 
 cluster-down: ## Удалить Kind-кластер
-	./cluster/delete.sh
+	./scripts/cluster-down.sh
 
-build: build-api build-worker ## Собрать оба образа
+build-api: ## Собрать образ API
+	docker build -t $(API_IMAGE):$(TAG) ./services/api
 
-build-api: ## Собрать образ shop-api
-	docker build -t $(API_IMAGE):$(TAG) ./service/api
+build-worker: ## Собрать образ worker
+	docker build -t $(WORKER_IMAGE):$(TAG) ./services/worker
 
-build-worker: ## Собрать образ shop-worker
-	docker build -t $(WORKER_IMAGE):$(TAG) ./service/worker
+build: build-api build-worker ## Собрать образы API и worker
 
 install-operator: ## Установить CloudNativePG operator
-	kubectl apply --server-side -f operator/cloudnative-pg.yaml
-	kubectl wait --for=condition=Available \
-	  deployment/cnpg-controller-manager \
-	  -n cnpg-system \
-	  --timeout=120s
+	helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts
+	helm repo update
+	helm upgrade --install cnpg cloudnative-pg/cloudnative-pg
+	--namespace cnpg-system
+	--create-namespace
+	--wait
+	--timeout 5m
 
-image-load: image-load-api image-load-worker ## Загрузить оба образа в kind
-
-image-load-api: build-api ## Загрузить shop-api в kind
+load-images: build ## Загрузить образы в Kind
 	kind load docker-image $(API_IMAGE):$(TAG) --name $(CLUSTER_NAME)
-
-image-load-worker: build-worker ## Загрузить shop-worker в kind
 	kind load docker-image $(WORKER_IMAGE):$(TAG) --name $(CLUSTER_NAME)
 
-deploy-shop: image-load ## Установить чарт shop через Helm
-	helm upgrade --install shop ./charts/shop \
-	  --namespace default \
-	  --set api.image.repository=$(API_IMAGE) \
-	  --set api.image.tag=$(TAG) \
-	  --set worker.image.repository=$(WORKER_IMAGE) \
-	  --set worker.image.tag=$(TAG) \
-	  --wait \
-	  --timeout 5m
+observability-deps: ## Скачать зависимости Helm-чарта observability
+	helm dependency update $(OBSERVABILITY_CHART)
 
-deploy: cluster-up install-operator deploy-shop ## Развернуть shop
+deploy-observability: observability-deps ## Установить стек observability
+	helm upgrade --install observability $(OBSERVABILITY_CHART)
+	--namespace monitoring
+	--create-namespace
+	--wait
+	--timeout 10m
 
-status: ## Показать состояние всего стенда
-	@echo "=== Kind nodes ==="
+deploy-shop: load-images ## Установить приложение
+	helm upgrade --install shop $(SHOP_CHART)
+	--namespace default
+	--set api.image.repository=$(API_IMAGE)
+	--set api.image.tag=$(TAG)
+	--set worker.image.repository=$(WORKER_IMAGE)
+	--set worker.image.tag=$(TAG)
+	--wait
+	--timeout 5m
+
+deploy: ## Развернуть кластер, observability и приложение
+	$(MAKE) cluster-up
+	$(MAKE) install-operator
+	$(MAKE) deploy-observability
+	$(MAKE) deploy-shop
+
+status: ## Показать состояние ресурсов Kubernetes
 	kubectl get nodes
-	@echo
-	@echo "=== Shop ==="
-	kubectl get pods,svc
-	@echo
-	@echo "=== Monitoring ==="
-	kubectl get pods,svc -n monitoring
+	kubectl get pods -A
+	kubectl get svc -A
 
-port-forward-api: ## API: localhost:8080
-	kubectl port-forward --address 0.0.0.0 svc/shop-api 8080:80
+port-forward-api: ## Открыть API на порту 8080
+	kubectl port-forward --address 0.0.0.0 svc/shop-api 8080:80 -n default
 
-port-forward-grafana: ## Grafana: localhost:3000
-	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-grafana 3000:80
+port-forward-grafana: ## Открыть Grafana на порту 3000
+	kubectl port-forward --address 0.0.0.0 svc/observability-grafana 3000:80 -n monitoring
 
-port-forward-prometheus: ## Prometheus: localhost:9090
-	kubectl port-forward --address 0.0.0.0 -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+port-forward-prometheus: ## Открыть Prometheus на порту 9090
+	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometheus-prometheus 9090:9090 -n monitoring
 
-port-forward-jaeger: ## Jaeger: localhost:16686
-	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-jaeger 16686:16686
+port-forward-alertmanager: ## Открыть Alertmanager на порту 9093
+	kubectl port-forward --address 0.0.0.0 svc/observability-kube-prometheus-alertmanager 9093:9093 -n monitoring
 
-port-forward-alertmanager: ## Alertmanager: localhost:9093
-	kubectl port-forward --address 0.0.0.0 -n monitoring svc/observability-kube-prometh-alertmanager 9093:9093
+port-forward-jaeger: ## Открыть Jaeger UI на порту 16686
+	kubectl port-forward --address 0.0.0.0 svc/observability-jaeger 16686:16686 -n monitoring
 
-clean: ## Удалить весь Kind-кластер
-	./cluster/delete.sh
+clean: ## Удалить Helm-релизы приложения и observability
+	helm uninstall shop -n default || true helm uninstall observability -n monitoring || true
