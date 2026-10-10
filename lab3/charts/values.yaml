@@ -31,7 +31,7 @@ kube-prometheus-stack:
           release: observability
 
       additionalScrapeConfigs:
-        - job_name: api-service
+        - job_name: shop-api
           static_configs:
             - targets:
                 - shop-api.default.svc.cluster.local:80
