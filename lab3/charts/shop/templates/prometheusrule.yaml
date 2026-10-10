@@ -12,6 +12,15 @@ spec:
     - name: shop-api
       interval: 15s
       rules:
+        - alert: ShopMonitoringTest
+        - expr: vector(1)
+        - labels:
+        - severity: warning
+        - service: shop-api
+        - annotations:
+        - summary: "Test alert for monitoring pipeline"
+        - description: "Temporary alert to verify Prometheus, Alertmanager and Karma."
+
         - alert: ShopApiHighErrorRate
           expr: |
             sum(rate(http_requests_total{job=~"shop-api",code=~"5.."}[1m])) > 0

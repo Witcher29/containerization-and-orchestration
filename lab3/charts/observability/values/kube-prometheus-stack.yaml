@@ -18,12 +18,12 @@ prometheus:
   prometheusSpec:
     replicas: 1
     retention: 2d
-    scrapeInterval: 15s
-    evaluationInterval: 15s
+    sruleSelectorNilUsesHelmValues: false
+    ruleNamespaceSelector: { }
     serviceMonitorSelectorNilUsesHelmValues: false
-    serviceMonitorNamespaceSelector: {}
-    ruleSelectorNilUsesHelmValues: false
-    ruleNamespaceSelector: {}
+    serviceMonitorNamespaceSelector: { }
+    evaluationInterval: 5s
+    scrapeInterval: 5s
     resources:
       requests:
         cpu: 200m
