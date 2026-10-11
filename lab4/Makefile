@@ -43,7 +43,6 @@ install-operator: ## Установить CloudNativePG operator
 	  --timeout=120s
 
 install-observability: ## Установить/обновить стек мониторинга (observability)
-	helm dependency build ./charts
 	helm upgrade --install observability ./charts \
 	  --namespace monitoring \
 	  --create-namespace \
