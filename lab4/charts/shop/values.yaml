@@ -3,7 +3,7 @@ commonLabels:
   env: dev
 
 api:
-  replicaCount: 3
+  replicaCount: 2
   image:
     repository: shop-api
     tag: v1
@@ -68,3 +68,41 @@ postgres:
     user: shop
     password: shop
     db: shop
+
+batch:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: shop-batch
+    tag: v1
+    pullPolicy: IfNotPresent
+
+  # Burstable: requests заметно ниже limits (гвардрейлы Лабы 3 соблюдены — limits есть).
+  # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  # Управление поведением batch через env, без пересборки образа.
+  env:
+    memoryTargetMiB: "200"     # плато по RSS в MiB
+    blockMiB: "10"             # размер одной аллокации
+    cpuBurn: "true"            # жжёт ли CPU на плато
+    allocIntervalMs: "100"     # пауза между аллокациями до выхода на плато
+
+  scheduling:
+    strategy: topologySpreadConstraints
+    topologySpreadConstraints:
+      maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: shop-batch
+          topologyKey: kubernetes.io/hostname

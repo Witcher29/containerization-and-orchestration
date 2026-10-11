@@ -34,7 +34,9 @@ kube-prometheus-stack:
         - job_name: api-service
           static_configs:
             - targets:
-                - api-service-api-service.default.svc.cluster.local:80
+                - shop-api.default.svc.cluster.local:80
+    defaultRules:
+      create: false
 
   alertmanager:
     enabled: true
