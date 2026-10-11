@@ -93,3 +93,46 @@ Prometheus не понимает CNPG как workload, но cAdvisor собир�
 <img width="440" height="322" alt="image" src="https://github.com/user-attachments/assets/fd352573-e21b-4c86-b187-2111eb070bd2" />
 
 Главный вывод: мы переоценили requests api/worker/postgres примерно в 2–5 раз. Классический «ставим на глаз с запасом» → krr показывает реальный пол. Для batch — наоборот, krr увидел то, что мы сами недооценили: burn-цикл жрёт CPU.
+
+## Часть 4 - Разнесение критического сервиса
+
+Механизм разнесения — `topologySpreadConstraints`.
+На скриншоте видно, что shop-api-...-nm69x крутится на lab4-scheduling-worker, а shop-api-...-snvp2 — на lab4-scheduling-worker2. Чистое 1+1, никаких «двух на одной ноде». Обе в Running, обе Ready 1/1.
+
+<img width="644" height="51" alt="image" src="https://github.com/user-attachments/assets/eacf778a-e8f7-4816-a1b2-11bfc27b8f55" />
+
+В манифесте видно ровно то, что мы задавали в values.yaml:
+
+`maxSkew`: `1`
+
+`topologyKey`: `"kubernetes.io/hostname"`
+
+`whenUnsatisfiable`: `"DoNotSchedule"`
+
+`labelSelector.matchLabels.app`: `"shop-api"`
+
+Это важно: механизм описан декларативно в чарте, а не прилетел разово через kubectl edit. Значит, при следующем helm upgrade поведение сохранится, и его нельзя случайно «потерять».
+
+<img width="224" height="139" alt="image" src="https://github.com/user-attachments/assets/57729245-b8f2-4eb1-8647-aa7a78c2d84f" />
+
+### Распределение подов в namespace default
+
+В данном случае видно не только про api:
+
+<img width="400" height="109" alt="image" src="https://github.com/user-attachments/assets/94942e37-9884-46ec-9934-e7b4f47df124" />
+
+- shop-api — по одному поду на каждой ноде.
+- shop-worker — тоже 1+1, по одному на worker и worker2.
+- shop-batch — один под на worker2 (у него всего 1 реплика, spread его ни к чему не обязывает).
+- shop-postgres-1 — на worker2.
+- shop-postgres-init — Succeeded, это Job, ему быть одновременно нигде не нужно.
+
+### Отказоусточйивость
+
+Если api держится одной нодой — падение этой ноды кладёт весь сервис. У нас api разнесён, и это даёт сразу три эффекта.
+
+- Падение ноды не вырубает сервис.
+Если worker целиком уйдёт в даун (kubelet креш, сеть, drain), Service shop-api автоматически выкинет под с мёртвой ноды из endpoints. Вся нагрузка пойдёт на вторую реплику на worker2. k6 под нагрузкой в такой момент может поймать пару секунд ошибок на переключении, но не длительный отказ.
+
+- Обновления и drain не блокируют трафик.
+При kubectl drain worker под перестаёт принимать трафик, но не уходит мгновенно — ему дают terminationGracePeriodSeconds. Вторая реплика в это время спокойно обслуживает. PDB из Части 5 дополнительно защитит от ситуации, когда drain попытается снести обе реплики одновременно.
