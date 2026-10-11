@@ -6,12 +6,12 @@ BATCH_IMAGE  := shop-batch
 TAG          := v1
 
 .PHONY: help cluster-up cluster-down \
-        install-operator \
+        install-operator install-observability \
         build build-api build-worker build-batch \
         image-load image-load-api image-load-worker image-load-batch \
-        deploy deploy-shop \
+        deploy deploy-shop deploy-observability \
         port-forward-api port-forward-grafana port-forward-prometheus \
-        port-forward-jaeger port-forward-alertmanager \
+        port-forward-alertmanager \
         status clean
 
 help: ## Показать доступные команды
@@ -42,6 +42,14 @@ install-operator: ## Установить CloudNativePG operator
 	  -n cnpg-system \
 	  --timeout=120s
 
+install-observability: ## Установить/обновить стек мониторинга (observability)
+	helm dependency build ./charts
+	helm upgrade --install observability ./charts \
+	  --namespace monitoring \
+	  --create-namespace \
+	  --wait \
+	  --timeout 15m
+
 image-load: image-load-api image-load-worker image-load-batch ## Загрузить все образы в kind ## Загрузить оба образа в kind
 
 image-load-api: build-api ## Загрузить shop-api в kind
@@ -65,7 +73,11 @@ deploy-shop: image-load ## Установить чарт shop через Helm
 	  --wait \
 	  --timeout 5m
 
-deploy: cluster-up install-operator deploy-shop ## Развернуть shop
+deploy-observability: install-observability ## Синоним (для консистентности)
+
+deploy: cluster-up install-operator deploy-shop install-observability ## Развернуть всё
+
+deploy-all: deploy-shop install-observability ## Всё сразу
 
 status: ## Показать состояние всего стенда
 	@echo "=== Kind nodes ==="
