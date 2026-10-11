@@ -1,13 +1,14 @@
-CLUSTER_NAME := observability-demo
+CLUSTER_NAME := lab4-scheduling
 
 API_IMAGE    := shop-api
 WORKER_IMAGE := shop-worker
+BATCH_IMAGE  := shop-batch
 TAG          := v1
 
 .PHONY: help cluster-up cluster-down \
         install-operator \
-        build build-api build-worker \
-        image-load image-load-api image-load-worker \
+        build build-api build-worker build-batch \
+        image-load image-load-api image-load-worker image-load-batch \
         deploy deploy-shop \
         port-forward-api port-forward-grafana port-forward-prometheus \
         port-forward-jaeger port-forward-alertmanager \
@@ -23,13 +24,16 @@ cluster-up: ## Создать Kind-кластер
 cluster-down: ## Удалить Kind-кластер
 	./cluster/delete.sh
 
-build: build-api build-worker ## Собрать оба образа
+build: build-api build-worker build-batch ## Собрать оба образа
 
 build-api: ## Собрать образ shop-api
 	docker build -t $(API_IMAGE):$(TAG) ./service/api
 
 build-worker: ## Собрать образ shop-worker
 	docker build -t $(WORKER_IMAGE):$(TAG) ./service/worker
+
+build-batch: ## Собрать образ shop-batch
+	docker build -t $(BATCH_IMAGE):$(TAG) ./service/batch
 
 install-operator: ## Установить CloudNativePG operator
 	kubectl apply --server-side -f operator/cloudnative-pg.yaml
@@ -38,13 +42,16 @@ install-operator: ## Установить CloudNativePG operator
 	  -n cnpg-system \
 	  --timeout=120s
 
-image-load: image-load-api image-load-worker ## Загрузить оба образа в kind
+image-load: image-load-api image-load-worker image-load-batch ## Загрузить все образы в kind ## Загрузить оба образа в kind
 
 image-load-api: build-api ## Загрузить shop-api в kind
 	kind load docker-image $(API_IMAGE):$(TAG) --name $(CLUSTER_NAME)
 
 image-load-worker: build-worker ## Загрузить shop-worker в kind
 	kind load docker-image $(WORKER_IMAGE):$(TAG) --name $(CLUSTER_NAME)
+
+image-load-batch: build-batch ## Загрузить shop-batch в kind
+	kind load docker-image $(BATCH_IMAGE):$(TAG) --name $(CLUSTER_NAME)
 
 deploy-shop: image-load ## Установить чарт shop через Helm
 	helm upgrade --install shop ./charts/shop \
@@ -53,6 +60,8 @@ deploy-shop: image-load ## Установить чарт shop через Helm
 	  --set api.image.tag=$(TAG) \
 	  --set worker.image.repository=$(WORKER_IMAGE) \
 	  --set worker.image.tag=$(TAG) \
+	  --set batch.image.repository=$(BATCH_IMAGE) \
+	  --set batch.image.tag=$(TAG) \
 	  --wait \
 	  --timeout 5m
 

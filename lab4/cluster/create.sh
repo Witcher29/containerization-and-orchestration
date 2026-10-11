@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CLUSTER_NAME="observability-demo"
+CLUSTER_NAME="lab4-scheduling"
 CONFIG="$(dirname "$0")/kind-config.yaml"
 
 # Проверки
