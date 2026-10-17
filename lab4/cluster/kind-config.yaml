@@ -1,6 +1,6 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: observability-demo
+name: lab4-scheduling
 
 # Версия Kubernetes (можно прибить гвоздями для воспроизводимости)
 # Без этого kind возьмёт последнюю стабильную

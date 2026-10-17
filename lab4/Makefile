@@ -1,4 +1,4 @@
-CLUSTER_NAME := observability-demo
+CLUSTER_NAME := lab4-scheduling
 
 API_IMAGE    := shop-api
 WORKER_IMAGE := shop-worker
@@ -6,7 +6,11 @@ BATCH_IMAGE  := shop-batch
 TAG          := v1
 
 .PHONY: help cluster-up cluster-down \
+<<<<<<< HEAD
         install-kyverno apply-policies install-monitoring install-operator \
+=======
+        install-operator \
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
         build build-api build-worker build-batch \
         image-load image-load-api image-load-worker image-load-batch \
         deploy deploy-shop \
@@ -25,12 +29,16 @@ cluster-up: ## Создать Kind-кластер
 cluster-down: ## Удалить Kind-кластер
 	./cluster/delete.sh
 
+<<<<<<< HEAD
 # ---------- Политики (часть 1 lab3, переиспользуются в lab4) ----------
 install-kyverno: ## Установить Kyverno
 	helm repo add kyverno https://kyverno.github.io/kyverno/ 2>/dev/null || true
 	helm repo update
 	helm upgrade --install kyverno kyverno/kyverno \
 	  --namespace kyverno --create-namespace --wait --timeout 10m
+=======
+build: build-api build-worker build-batch ## Собрать оба образа
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
 
 apply-policies: ## Применить политики
 	kubectl apply -f policies/
@@ -41,14 +49,24 @@ install-monitoring: ## Установить стек мониторинга
 	helm upgrade --install observability ./charts/observability \
 	  --namespace monitoring --create-namespace --wait --timeout 15m
 
+<<<<<<< HEAD
 # ---------- Оператор Postgres ----------
+=======
+build-batch: ## Собрать образ shop-batch
+	docker build -t $(BATCH_IMAGE):$(TAG) ./service/batch
+
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
 install-operator: ## Установить CloudNativePG operator
 	kubectl apply --server-side -f operator/cloudnative-pg.yaml
 	kubectl wait --for=condition=Available \
 	  deployment/cnpg-controller-manager -n cnpg-system --timeout=120s
 
+<<<<<<< HEAD
 # ---------- Сборка образов ----------
 build: build-api build-worker build-batch
+=======
+image-load: image-load-api image-load-worker image-load-batch ## Загрузить все образы в kind ## Загрузить оба образа в kind
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
 
 build-api: ## Собрать shop-api
 	docker build -t $(API_IMAGE):$(TAG) ./service/api
@@ -67,11 +85,18 @@ image-load-api: build-api
 image-load-worker: build-worker
 	kind load docker-image $(WORKER_IMAGE):$(TAG) --name $(CLUSTER_NAME)
 
+<<<<<<< HEAD
 image-load-batch: build-batch
 	kind load docker-image $(BATCH_IMAGE):$(TAG) --name $(CLUSTER_NAME)
 
 # ---------- Shop ----------
 deploy-shop: image-load ## Установить чарт shop
+=======
+image-load-batch: build-batch ## Загрузить shop-batch в kind
+	kind load docker-image $(BATCH_IMAGE):$(TAG) --name $(CLUSTER_NAME)
+
+deploy-shop: image-load ## Установить чарт shop через Helm
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
 	helm upgrade --install shop ./charts/shop \
 	  --namespace default \
 	  --set api.image.repository=$(API_IMAGE) \
@@ -80,7 +105,12 @@ deploy-shop: image-load ## Установить чарт shop
 	  --set worker.image.tag=$(TAG) \
 	  --set batch.image.repository=$(BATCH_IMAGE) \
 	  --set batch.image.tag=$(TAG) \
+<<<<<<< HEAD
 	  --wait --timeout 5m
+=======
+	  --wait \
+	  --timeout 5m
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
 
 deploy: cluster-up install-kyverno apply-policies install-operator deploy-shop
 

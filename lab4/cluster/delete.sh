@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CLUSTER_NAME="observability-demo"
+CLUSTER_NAME="lab4-scheduling"
 
 if kind get clusters | grep -qx "$CLUSTER_NAME"; then
   kind delete cluster --name "$CLUSTER_NAME"
