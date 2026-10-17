@@ -81,15 +81,15 @@ batch:
   # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
   resources:
     requests:
-      cpu: "100m"
-      memory: "128Mi"
+      cpu: "500m"           # Увеличиваем
+      memory: "64Mi"
     limits:
-      cpu: "700m"       # requests < limits -> Burstable
+      cpu: "500m"
       memory: "256Mi"
 
   # Управление поведением batch через env, без пересборки образа.
   env:
-    memoryTargetMiB: "200"     # плато по RSS в MiB
+    memoryTargetMiB: "10"     # плато по RSS в MiB
     blockMiB: "10"             # размер одной аллокации
     cpuBurn: "false"            # жжёт ли CPU на плато
     allocIntervalMs: "100"     # пауза между аллокациями до выхода на плато
