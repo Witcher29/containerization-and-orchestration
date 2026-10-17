@@ -21,10 +21,6 @@ api:
   env:
     port: "8080"
     healthFail: "false"
-  tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      operator: "Exists"
-      effect: "NoSchedule"
 
   scheduling:
     strategy: topologySpreadConstraints
@@ -54,10 +50,6 @@ worker:
     limits:
       cpu: "100m"
       memory: "128Mi"
-  tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      operator: "Exists"
-      effect: "NoSchedule"
 
 postgres:
   image:
@@ -114,10 +106,6 @@ batch:
             matchLabels:
               app: shop-batch
           topologyKey: kubernetes.io/hostname
-  tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      operator: "Exists"
-      effect: "NoSchedule"
 
 priorityClasses:
   critical:

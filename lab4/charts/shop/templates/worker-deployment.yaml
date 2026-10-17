@@ -16,7 +16,6 @@ spec:
         app: shop-worker
         {{- toYaml .Values.commonLabels | nindent 8 }}
     spec:
-      tolerations: {{- toYaml .Values.api.tolerations | nindent 8 }}
       containers:
         - name: worker
           image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
