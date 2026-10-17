@@ -59,11 +59,11 @@ postgres:
     port: 5432
   resources:
     requests:
-      cpu: "20m"
-      memory: "128Mi"
+      cpu: "200m"       # Подняли с 20m -> 200m, иначе не запустится
+      memory: "512Mi"   # Подняли с 128Mi -> 512Mi
     limits:
-      cpu: "20m"        # requests = limits -> Guaranteed
-      memory: "128Mi"
+      cpu: "200m"       # Оставляем Guaranteed
+      memory: "512Mi"
   auth:
     user: shop
     password: shop
