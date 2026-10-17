@@ -3,7 +3,7 @@ commonLabels:
   env: dev
 
 api:
-  replicaCount: 10
+  replicaCount: 2
   image:
     repository: shop-api
     tag: v1
@@ -28,7 +28,7 @@ api:
     topologySpreadConstraints:
       maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: ScheduleAnyway
+      whenUnsatisfiable: DoNotSchedule
 
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -71,7 +71,7 @@ postgres:
 
 batch:
   enabled: true
-  replicaCount: 25
+  replicaCount: 1
   image:
     repository: shop-batch
     tag: v1
@@ -81,11 +81,14 @@ batch:
   # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
   resources:
     requests:
-      cpu: "500m"           # Увеличиваем
-      memory: "64Mi"
+      cpu: "100m"
+      memory: "128Mi"
     limits:
-      cpu: "500m"
+      cpu: "700m"
       memory: "256Mi"
+    env:
+      memoryTargetMiB: "200"
+      cpuBurn: "true"
 
   # Управление поведением batch через env, без пересборки образа.
   env:
