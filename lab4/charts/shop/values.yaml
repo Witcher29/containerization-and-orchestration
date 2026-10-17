@@ -71,7 +71,7 @@ postgres:
 
 batch:
   enabled: true
-  replicaCount: 80
+  replicaCount: 25
   image:
     repository: shop-batch
     tag: v1
@@ -91,7 +91,7 @@ batch:
   env:
     memoryTargetMiB: "200"     # плато по RSS в MiB
     blockMiB: "10"             # размер одной аллокации
-    cpuBurn: "true"            # жжёт ли CPU на плато
+    cpuBurn: "false"            # жжёт ли CPU на плато
     allocIntervalMs: "100"     # пауза между аллокациями до выхода на плато
 
   scheduling:
