@@ -1,0 +1,31 @@
+{{- if .Values.pdb.api.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "shop.fullname" . }}-api-pdb
+  labels:
+    app: shop-api
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.api.minAvailable }}
+  selector:
+    matchLabels:
+      app: shop-api
+{{- end }}
+
+{{- if .Values.pdb.postgres.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "shop.fullname" . }}-postgres-pdb
+  labels:
+    app: shop-postgres
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.postgres.minAvailable }}
+  selector:
+    matchLabels:
+      app: shop-postgres
+{{- end }}

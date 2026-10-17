@@ -17,6 +17,8 @@ spec:
         app: shop-batch
         {{- toYaml .Values.commonLabels | nindent 8 }}
     spec:
+      priorityClassName: {{ .Values.priorityClasses.batch.name }}
+      {{- if eq .Values.batch.scheduling.strategy "topologySpreadConstraints" }}
       containers:
         - name: batch
           image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"

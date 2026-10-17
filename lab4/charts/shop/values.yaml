@@ -12,11 +12,11 @@ api:
     port: 80
     targetPort: 8080
   resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
     requests:
-      cpu: "100m"
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "50m"        # requests = limits -> Guaranteed
       memory: "128Mi"
   env:
     port: "8080"
@@ -44,12 +44,12 @@ worker:
     tag: v1
     pullPolicy: IfNotPresent
   resources:
-    limits:
-      cpu: "300m"
-      memory: "128Mi"
     requests:
-      cpu: "50m"
-      memory: "64Mi"
+      cpu: "10m"
+      memory: "28Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
 
 postgres:
   image:
@@ -58,34 +58,24 @@ postgres:
   service:
     port: 5432
   resources:
-    requests: { cpu: "20m", memory: "128Mi" }
-    limits: { cpu: "20m", memory: "128Mi" }   # Guaranteed
+    requests:
+      cpu: "20m"
+      memory: "128Mi"
+    limits:
+      cpu: "20m"        # requests = limits -> Guaranteed
+      memory: "128Mi"
   auth:
     user: shop
     password: shop
     db: shop
-<<<<<<< HEAD
-    
-batch:
-=======
 
 batch:
   enabled: true
->>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
   replicaCount: 1
   image:
     repository: shop-batch
     tag: v1
     pullPolicy: IfNotPresent
-<<<<<<< HEAD
-  resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
-    requests:
-      cpu: "100m"
-      memory: "128Mi"
-=======
 
   # Burstable: requests заметно ниже limits (гвардрейлы Лабы 3 соблюдены — limits есть).
   # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
@@ -94,8 +84,8 @@ batch:
       cpu: "100m"
       memory: "128Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "700m"       # requests < limits -> Burstable
+      memory: "256Mi"
 
   # Управление поведением batch через env, без пересборки образа.
   env:
@@ -116,4 +106,19 @@ batch:
             matchLabels:
               app: shop-batch
           topologyKey: kubernetes.io/hostname
->>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
+
+priorityClasses:
+  critical:
+    name: shop-critical
+    value: 100000       # Высокий приоритет
+  batch:
+    name: shop-batch
+    value: -10          # Низкий приоритет (ниже системных, но поды будут жить)
+
+pdb:
+  api:
+    enabled: true
+    minAvailable: 1
+  postgres:
+    enabled: true
+    minAvailable: 1

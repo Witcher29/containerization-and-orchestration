@@ -17,6 +17,8 @@ spec:
         {{- toYaml .Values.commonLabels | nindent 8 }}
     spec:
         {{- if eq .Values.api.scheduling.strategy "topologySpreadConstraints" }}
+      priorityClassName: {{ .Values.priorityClasses.critical.name }}
+      {{- if eq .Values.api.scheduling.strategy "topologySpreadConstraints" }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.api.scheduling.topologySpreadConstraints.maxSkew }}
           topologyKey: {{ .Values.api.scheduling.topologySpreadConstraints.topologyKey }}
