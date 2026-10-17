@@ -86,13 +86,10 @@ batch:
     limits:
       cpu: "700m"
       memory: "256Mi"
-    env:
-      memoryTargetMiB: "200"
-      cpuBurn: "true"
 
   # Управление поведением batch через env, без пересборки образа.
   env:
-    memoryTargetMiB: "10"     # плато по RSS в MiB
+    memoryTargetMiB: "200"     # плато по RSS в MiB
     blockMiB: "10"             # размер одной аллокации
     cpuBurn: "false"            # жжёт ли CPU на плато
     allocIntervalMs: "100"     # пауза между аллокациями до выхода на плато
