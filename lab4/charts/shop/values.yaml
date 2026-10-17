@@ -89,10 +89,10 @@ batch:
 
   # Управление поведением batch через env, без пересборки образа.
   env:
-    memoryTargetMiB: "1500"  # Каждая реплика съест по 1.5 ГБ
+    memoryTargetMiB: "1800"  # Каждая реплика съест по 1.5 ГБ
     blockMiB: "10"             # размер одной аллокации
     cpuBurn: "false"            # жжёт ли CPU на плато
-    allocIntervalMs: "100"     # пауза между аллокациями до выхода на плато
+    allocIntervalMs: "500"     # пауза между аллокациями до выхода на плато
 
   scheduling:
     strategy: topologySpreadConstraints
