@@ -17,7 +17,7 @@ kubeadmConfigPatches:
   - |
     kind: KubeletConfiguration
     evictionHard:
-      memory.available: "200Mi"    
+      memory.available: "1000Mi"    
 
 # Сеть внутри кластера
 networking:

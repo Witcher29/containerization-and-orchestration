@@ -71,7 +71,7 @@ postgres:
 
 batch:
   enabled: true
-  replicaCount: 4
+  replicaCount: 2
   image:
     repository: shop-batch
     tag: v1
@@ -85,11 +85,11 @@ batch:
       memory: "128Mi"        # Оставляем низким -> Burstable
     limits:
       cpu: "700m"
-      memory: "4Gi"          # ВЫСОКИЙ ЛИМИТ (2 ГБ), чтобы не было OOMKilled по своему лимиту
+      memory: "2Gi"          # ВЫСОКИЙ ЛИМИТ (2 ГБ), чтобы не было OOMKilled по своему лимиту
 
   # Управление поведением batch через env, без пересборки образа.
   env:
-    memoryTargetMiB: "1800"  # Каждая реплика съест по 1.5 ГБ
+    memoryTargetMiB: "1000"  # Каждая реплика съест по 1.5 ГБ
     blockMiB: "10"             # размер одной аллокации
     cpuBurn: "false"            # жжёт ли CPU на плато
     allocIntervalMs: "500"     # пауза между аллокациями до выхода на плато
