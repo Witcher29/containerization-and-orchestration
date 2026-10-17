@@ -99,7 +99,7 @@ batch:
     topologySpreadConstraints:
       maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
+      whenUnsatisfiable: ScheduleAnyway
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
