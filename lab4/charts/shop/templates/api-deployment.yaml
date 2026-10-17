@@ -19,6 +19,8 @@ spec:
       # Добавлен класс приоритета для критического пути
       priorityClassName: {{ .Values.priorityClasses.critical.name }}
 
+      tolerations: {{- toYaml .Values.api.tolerations | nindent 8 }}
+
       # Механизм разнесения из Части 1
       {{- if eq .Values.api.scheduling.strategy "topologySpreadConstraints" }}
       topologySpreadConstraints:

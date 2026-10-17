@@ -17,6 +17,7 @@ spec:
         app: shop-batch
         {{- toYaml .Values.commonLabels | nindent 8 }}
     spec:
+      tolerations: {{- toYaml .Values.api.tolerations | nindent 8 }}
       {{- if eq .Values.batch.scheduling.strategy "topologySpreadConstraints" }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.batch.scheduling.topologySpreadConstraints.maxSkew }}
