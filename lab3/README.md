@@ -171,4 +171,21 @@ CloudNativePG использует Kubernetes Custom Resource Cluster для о�
 
 <img width="974" height="138" alt="image" src="https://github.com/user-attachments/assets/493d32c4-b50f-488d-a0be-81aabfa00de8" />
 
+## Часть 5
+
+Для сбора метрик в Helm-чарт shop добавлены два ресурса: ServiceMonitor (указывает Prometheus собирать метрики с сервиса shop-api по пути /metrics каждые 15 секунд) и PrometheusRule (содержит 3 правила оповещения).
+
+Три алерта:
+
+- ApiServiceHighErrorRate — срабатывает, если доля ошибок 5xx превышает 10% в течение 2 минут. Ловит проблемы, напрямую влияющие на пользователей (например, падение базы данных).
+
+- ApiServiceHighLatency — срабатывает, если 95-й процентиль времени ответа превышает 1 секунду в течение 2 минут. Помогает заметить деградацию производительности до того, как она станет критичной.
+
+- ApiServiceDown — срабатывает, если Prometheus не может собрать метрики (сервис недоступен) в течение 1 минуты. Самый критичный алерт, требующий немедленного вмешательства.
+
+<img width="1509" height="678" alt="image" src="https://github.com/user-attachments/assets/cc5c99d2-234c-4c9c-bb5f-20fd6af72737" />
+
+Алерт в Firing состоянии после 2-х минут работы команды: while true; do curl -s http://localhost:8080/fail > /dev/null; sleep 0.1; done
+
+<img width="1837" height="722" alt="image" src="https://github.com/user-attachments/assets/1141a3bf-a5ac-4597-b73b-1dbba51ca060" />
 

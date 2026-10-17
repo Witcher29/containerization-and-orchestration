@@ -64,14 +64,28 @@ postgres:
     user: shop
     password: shop
     db: shop
+<<<<<<< HEAD
+    
+batch:
+=======
 
 batch:
   enabled: true
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
   replicaCount: 1
   image:
     repository: shop-batch
     tag: v1
     pullPolicy: IfNotPresent
+<<<<<<< HEAD
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+=======
 
   # Burstable: requests заметно ниже limits (гвардрейлы Лабы 3 соблюдены — limits есть).
   # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
@@ -102,3 +116,4 @@ batch:
             matchLabels:
               app: shop-batch
           topologyKey: kubernetes.io/hostname
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93

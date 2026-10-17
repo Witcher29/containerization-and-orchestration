@@ -5,6 +5,18 @@ metadata:
 spec:
   validationActions: [Deny]
   matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kube-public
+            - kube-node-lease
+            - local-path-storage
+            - cnpg-system
+            - monitoring
+            - kyverno
     resourceRules:
       - apiGroups: [""]
         apiVersions: ["v1"]

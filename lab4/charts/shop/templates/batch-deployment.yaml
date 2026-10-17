@@ -1,3 +1,29 @@
+<<<<<<< HEAD
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-batch
+  labels:
+    app: shop-batch
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  replicas: {{ .Values.batch.replicaCount }}
+  selector:
+    matchLabels:
+      app: shop-batch
+  template:
+    metadata:
+      labels:
+        app: shop-batch
+        {{- toYaml .Values.commonLabels | nindent 8 }}
+    spec:
+      containers:
+        - name: batch
+          image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"
+          imagePullPolicy: {{ .Values.batch.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.batch.resources | nindent 12 }}
+=======
 {{- if .Values.batch.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -46,3 +72,4 @@ spec:
           resources:
             {{- toYaml .Values.batch.resources | nindent 12 }}
 {{- end }}
+>>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
