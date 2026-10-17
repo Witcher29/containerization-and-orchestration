@@ -11,7 +11,6 @@ nodes:
   - role: control-plane
   # Рабочие узлы — здесь крутятся ваши приложения
   - role: worker
-  - role: worker
 
 # Сеть внутри кластера
 networking:

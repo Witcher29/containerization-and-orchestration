@@ -68,3 +68,17 @@ postgres:
     user: shop
     password: shop
     db: shop
+    
+batch:
+  replicaCount: 1
+  image:
+    repository: shop-batch
+    tag: v1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"

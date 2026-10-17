@@ -78,6 +78,9 @@ func ordersHandler(w http.ResponseWriter, r *http.Request) {
 // connectDB — подключается к Postgres с ретраями.
 // БД может ещё не быть готова на старте пода,
 // поэтому ждём и пробуем снова.
+// connectDB — подключается к Postgres с ретраями и выполняет миграцию.
+// БД может ещё не быть готова на старте пода,
+// поэтому ждём и пробуем снова.
 func connectDB() *sql.DB {
 	host := env("POSTGRES_HOST", "postgres")
 	port := env("POSTGRES_PORT", "5432")
@@ -97,7 +100,7 @@ func connectDB() *sql.DB {
 		if err == nil {
 			if pingErr := conn.Ping(); pingErr == nil {
 				log.Println("connected to postgres")
-				return conn
+				break
 			} else {
 				err = pingErr
 			}
@@ -105,8 +108,25 @@ func connectDB() *sql.DB {
 		log.Printf("waiting for postgres (%d/30): %v", i+1, err)
 		time.Sleep(2 * time.Second)
 	}
-	log.Fatalf("could not connect to postgres: %v", err)
-	return nil
+	if err != nil {
+		log.Fatalf("could not connect to postgres: %v", err)
+	}
+
+	// Миграция: создаём таблицу orders, если её нет.
+	// IF NOT EXISTS делает операцию идемпотентной —
+	// безопасно вызывать при каждом старте пода.
+	_, err = conn.Exec(`
+		CREATE TABLE IF NOT EXISTS orders (
+			id      SERIAL PRIMARY KEY,
+			status  TEXT NOT NULL DEFAULT 'new'
+		)
+	`)
+	if err != nil {
+		log.Fatalf("migration failed: %v", err)
+	}
+	log.Println("database migrated: orders table ready")
+
+	return conn
 }
 
 func env(key, def string) string {
