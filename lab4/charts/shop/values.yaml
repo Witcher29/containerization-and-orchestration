@@ -71,7 +71,7 @@ postgres:
 
 batch:
   enabled: true
-  replicaCount: 2
+  replicaCount: 6
   image:
     repository: shop-batch
     tag: v1
