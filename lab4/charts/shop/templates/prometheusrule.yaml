@@ -1,0 +1,40 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-alerts
+  labels:
+    release: observability
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  groups:
+    - name: shop.rules
+      rules:
+        # Алерт 1: Высокий процент ошибок 5xx
+        - alert: ShopApiHighErrorRate
+          expr: sum(rate(http_requests_total{code=~"5.."}[1m])) > 0
+          for: 10s
+          labels:
+            severity: critical
+          annotations:
+            summary: "API возвращает ошибки 5xx"
+            description: "Сервис API генерирует ошибки 5xx. Возможно, недоступна БД."
+
+        # Алерт 2: Высокая задержка (SLA)
+        - alert: ShopApiHighLatency
+          expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~".*api-service.*"}[2m])) by (le)) > 0.3
+          for: 30s
+          labels:
+            severity: warning
+          annotations:
+            summary: "Высокая задержка API (p95 > 300ms)"
+            description: "95-й перцентиль задержки превышает 300 мс, SLA под угрозой."
+
+        # Алерт 3: Поды в состоянии Pending или недоступны
+        - alert: ShopPodsPending
+          expr: sum(kube_pod_status_phase{namespace="{{ .Release.Namespace }}", phase="Pending"}) > 0
+          for: 30s
+          labels:
+            severity: warning
+          annotations:
+            summary: "Есть поды в статусе Pending"
+            description: "Кластер не может разместить новые поды из-за нехватки ресурсов."

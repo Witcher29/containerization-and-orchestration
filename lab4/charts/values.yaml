@@ -14,6 +14,11 @@ kube-prometheus-stack:
     sidecar:
       datasources:
         enabled: true
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: "1"
+        searchNamespace: ALL
 
     additionalDataSources:
       - name: Loki
@@ -22,24 +27,45 @@ kube-prometheus-stack:
         url: http://observability-loki:3100
         isDefault: false
 
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+      sidecar:
+
   prometheus:
     prometheusSpec:
       retention: 2d
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
       serviceMonitorNamespaceSelector: { }
       serviceMonitorSelector:
         matchLabels:
           release: observability
-
       additionalScrapeConfigs:
         - job_name: api-service
           static_configs:
             - targets:
                 - shop-api.default.svc.cluster.local:80
-    defaultRules:
-      create: false
 
   alertmanager:
     enabled: true
+    alertmanagerSpec:
+      resources:
+        requests:
+          cpu: "20m"
+          memory: "64Mi"
+        limits:
+          cpu: "100m"
+          memory: "128Mi"
 
 
 loki:
@@ -66,6 +92,13 @@ loki:
 
   singleBinary:
     replicas: 1
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        cpu: "300m"
+        memory: "512Mi"
 
   gateway:
     enabled: false
@@ -147,7 +180,7 @@ jaeger:
     type: memory
 
   allInOne:
-    enabled: true
+    enabled: false
 
   collector:
     enabled: false

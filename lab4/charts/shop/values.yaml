@@ -12,11 +12,11 @@ api:
     port: 80
     targetPort: 8080
   resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
     requests:
-      cpu: "100m"
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "50m"        # requests = limits -> Guaranteed
       memory: "128Mi"
   env:
     port: "8080"
@@ -44,12 +44,12 @@ worker:
     tag: v1
     pullPolicy: IfNotPresent
   resources:
-    limits:
-      cpu: "300m"
-      memory: "128Mi"
     requests:
-      cpu: "50m"
-      memory: "64Mi"
+      cpu: "10m"
+      memory: "28Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
 
 postgres:
   image:
@@ -58,38 +58,24 @@ postgres:
   service:
     port: 5432
   resources:
-    limits:
-      cpu: "500m"
-      memory: "512Mi"
     requests:
-      cpu: "200m"
-      memory: "256Mi"
+      cpu: "200m"       # Поднял с 20m -> 200m, иначе не запустится
+      memory: "512Mi"   # Поднял с 128Mi -> 512Mi
+    limits:
+      cpu: "200m"       # Оставляем Guaranteed
+      memory: "512Mi"
   auth:
     user: shop
     password: shop
     db: shop
-<<<<<<< HEAD
-    
-batch:
-=======
 
 batch:
   enabled: true
->>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
   replicaCount: 1
   image:
     repository: shop-batch
     tag: v1
     pullPolicy: IfNotPresent
-<<<<<<< HEAD
-  resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
-    requests:
-      cpu: "100m"
-      memory: "128Mi"
-=======
 
   # Burstable: requests заметно ниже limits (гвардрейлы Лабы 3 соблюдены — limits есть).
   # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
@@ -98,26 +84,41 @@ batch:
       cpu: "100m"
       memory: "128Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "700m"
+      memory: "256Mi"
 
   # Управление поведением batch через env, без пересборки образа.
   env:
-    memoryTargetMiB: "200"     # плато по RSS в MiB
-    blockMiB: "10"             # размер одной аллокации
-    cpuBurn: "true"            # жжёт ли CPU на плато
-    allocIntervalMs: "100"     # пауза между аллокациями до выхода на плато
+    memoryTargetMiB: "200"
+    blockMiB: "10"
+    cpuBurn: "true"
+    allocIntervalMs: "100"
 
   scheduling:
     strategy: topologySpreadConstraints
     topologySpreadConstraints:
       maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
+      whenUnsatisfiable: ScheduleAnyway
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
             matchLabels:
               app: shop-batch
           topologyKey: kubernetes.io/hostname
->>>>>>> 089522b5dd2fde45036de39d20234d27b773da93
+
+priorityClasses:
+  critical:
+    name: shop-critical
+    value: 100000       # Высокий приоритет
+  batch:
+    name: shop-batch
+    value: -10          # Низкий приоритет (ниже системных, но поды будут жить)
+
+pdb:
+  api:
+    enabled: true
+    minAvailable: 1
+  postgres:
+    enabled: true
+    minAvailable: 1

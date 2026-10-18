@@ -11,6 +11,13 @@ nodes:
   - role: control-plane
   # Рабочие узлы — здесь крутятся ваши приложения
   - role: worker
+  - role: worker
+
+kubeadmConfigPatches:
+  - |
+    kind: KubeletConfiguration
+    evictionHard:
+      memory.available: "1000Mi"    
 
 # Сеть внутри кластера
 networking:
