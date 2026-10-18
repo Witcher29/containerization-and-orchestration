@@ -3,7 +3,7 @@ commonLabels:
   env: dev
 
 api:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: shop-api
     tag: v1

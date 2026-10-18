@@ -11,7 +11,7 @@ spec:
       rules:
         # Алерт 1: Высокий процент ошибок 5xx
         - alert: ShopApiHighErrorRate
-          expr: sum(rate(http_requests_total{job=~".*api-service.*", code=~"5.."}[2m])) > 0
+          expr: sum(rate(http_requests_total{code=~"5.."}[1m])) > 0
           for: 10s
           labels:
             severity: critical
