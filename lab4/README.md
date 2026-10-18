@@ -136,3 +136,63 @@ Prometheus не понимает CNPG как workload, но cAdvisor собир�
 
 - Обновления и drain не блокируют трафик.
 При kubectl drain worker под перестаёт принимать трафик, но не уходит мгновенно — ему дают terminationGracePeriodSeconds. Вторая реплика в это время спокойно обслуживает. PDB из Части 5 дополнительно защитит от ситуации, когда drain попытается снести обе реплики одновременно.
+
+## Часть 5 - Приоритеты и гарантии
+
+Добавили в Helm-чарт shop шаблоны priorityclass.yaml и pdb.yaml. В values.yaml настроили классы для критического пути и фоновой нагрузки. Для api и postgres выставили requests = limits (QoS Guaranteed) и высокий приоритет shop-critical. Для batch оставили requests < limits (QoS Burstable), лимиты на месте (гвардрейлы соблюдены), но назначили низкий приоритет shop-batch.
+### Проверка QoS-классов
+Здесь мы наглядно видим, как Kubernetes распределил поды по классам обслуживания. Критический путь — api и postgres — получил статус Guaranteed (потому что requests равны limits). А фоновая нагрузка batch и worker осталась в Burstable, так как их requests заметно ниже лимитов. Именно такое разделение позволит системе под давлением по памяти вытеснить batch первым, сохранив жизнь критическим серви
+
+<img width="974" height="138" alt="image" src="https://github.com/user-attachments/assets/1342a5f1-7e35-4c98-9081-8afe422427e1" />
+
+### Проверка назначенных PriorityClass
+На этом скрине видно, что приоритеты расставлены корректно: у api и postgres стоит высокий класс shop-critical, а у batch — низкий shop-batch. У worker и init-джобы приоритет не задан (там <none>), и это нормально, они не участвуют в сценариях вытеснения. Благодаря этой настройке планировщик при нехватке места сможет «подвинуть» батч, чтобы посадить на ноду важный под апи.
+
+<img width="974" height="132" alt="image" src="https://github.com/user-attachments/assets/9a6800b1-97d4-45a9-95ac-93798cd0d752" />
+
+### Проверка PDB
+Тут зафиксирована работа PDB. Для api мы видим наш ручной shop-api-pdb с одной разрешенной диструпцией (потому что реплик две, и одну можно безопасно выключить при обновлении ноды). А для postgres оператор CloudNativePG автоматически создал shop-postgres-primary с ALLOWED DISRUPTIONS: 0 — это железобетонная защита единственной базы данных от случайного вытеснения во время kubectl drain.
+
+<img width="974" height="111" alt="image" src="https://github.com/user-attachments/assets/e44c7d06-3121-4e2c-83d0-11e3cb2dee56" />
+
+### Инцидент с базой данных
+Изначально мы взяли для postgres цифры из Части 3 (krr рекомендовал 20m CPU / 128Mi RAM). Но когда мы сделали их Guaranteed (requests=limits), база не смогла запуститься. CNPG ушёл в Cluster Is Not Ready, а за ним в CrashLoopBackOff упали api и worker, так как им не к кому было подключаться.
+
+<img width="974" height="386" alt="image" src="https://github.com/user-attachments/assets/f5703711-f93e-427e-b20d-ba6e73d8a75f" />
+
+Причина: krr собирает метрики уже работающего пода под лёгкой нагрузкой. Но при старте Postgres запускает initdb, поднимает WAL и shared_buffers, потребляя ресурсы скачкообразно. 20m CPU (2% ядра) и 128Mi оказалось слишком мало, контейнер душило планировщиком. Решение: мы скорректировали requests/limits для postgres до 200m / 512Mi, оставив их равными (Guaranteed). База ожила, api и worker поднялись.
+
+## Часть 6 - Создание нехватки, ловля preemption
+
+Мы подняли batch.replicas до 25. Часть подов ушла в Pending. В событии FailedScheduling планировщик четко указал причину: 0/3 nodes are available: ... 2 Insufficient cpu. Это доказывает, что планировщик оценивает доступность ресурсов строго по параметру requests, а не по фактическому потреблению или лимитам. Так как сумма запрошенных CPU превысила доступную емкость worker-нод, новые поды не были размещены.
+Более того, в событии видно preemption: ... 2 No preemption victims found. Это означает, что планировщик попытался освободить место через вытеснение, но не нашел жертв, так как все поды на нодах имели такой же низкий приоритет (shop-batch), как и входящий под. Убийство равного по приоритету не допускается.
+
+<img width="974" height="195" alt="image" src="https://github.com/user-attachments/assets/2633a82a-5226-4a0c-ae7f-a6075107e965" />
+<img width="974" height="86" alt="image" src="https://github.com/user-attachments/assets/81221702-a0c3-4e1a-af23-623f55a511cd" />
+
+### Preemption (Вытеснение)
+После того как кластер был забит низкоприоритетными подами batch (до состояния Pending), мы увеличили количество реплик критического api до 10. Все 10 подов запустились.
+
+<img width="889" height="424" alt="image" src="https://github.com/user-attachments/assets/2ad71904-5a03-4513-8bc5-8a51de0f917d" />
+
+Так как у api PriorityClass: shop-critical (100000), а у batch — shop-batch (-10), планировщик не стал оставлять новые поды api в Pending. В логах событий (kubectl get events) видно: preemption: found a potential placement for pod on node lab4-scheduling-worker, preempting 1 victims, после чего следует Normal Preempted ... Preempted by pod shop-api. Это доказывает, что планировщик выбрал под batch на ноде, вытеснил (убил) его, освободив необходимые requests, и запустил на его месте высокоприоритетный под api.
+
+<img width="974" height="60" alt="image" src="https://github.com/user-attachments/assets/54944f77-d289-451e-9daf-332e352faaae" />
+
+### Проблема с вытеснением batch подов
+Столкнулся с проблемой, что жесткий topologySpreadConstraints с DoNotSchedule блокировал Preemption, так как планировщик не мог найти идеально сбалансированное место даже после убийства жертвы, поэтому изначально не получалось запустить 10 api подов, в running все равно было 2, а все остальные в pending. Было принято решение : смена на ScheduleAnyway позволила ему освободить место, пожертвовав идеальным балансом ради запуска критического сервиса — это показывает приоритет доступности над строгой топологией в момент нехватки).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
