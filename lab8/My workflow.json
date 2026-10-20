@@ -1,0 +1,188 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "error-triage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        208
+      ],
+      "id": "b2335dce-3fe7-4414-8bc0-0c3e0e614373",
+      "name": "Webhook",
+      "webhookId": "a29b5c66-e368-4ae7-a08d-c0e5db58d580"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Проанализируй эту ошибку: {{ $json.body.error }}",
+        "options": {
+          "systemMessage": "Ты — Senior SRE. Твоя задача — классифицировать ошибки. Правила: 1. Если в тексте ошибки есть 'panic', 'database', 'timeout' или 'null pointer' — это 'Critical'. 2. Если в тексте ошибки есть 'invalid input', 'validation failed' или '401' — это 'Warning'. 3. Если ошибка 'Critical' — ОБЯЗАТЕЛЬНО вызови инструмент write_file (создай тикет). 4. Если ошибка 'Warning' — ОБЯЗАТЕЛЬНО вызови инструмент write_file (сохрани в лог)."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        144,
+        224
+      ],
+      "id": "4eb24269-8945-437b-b713-5dc56771aaff",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "=openrouter/free",
+          "mode": "id"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        432
+      ],
+      "id": "a7ba0723-0bc7-42b9-852a-bb26ee125106",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "IiJpjqpMCfb5sEBW",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://127.0.0.1:8812/sse",
+        "serverTransport": "sse",
+        "include": "selected",
+        "includeTools": [
+          "write_file"
+        ],
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [
+        304,
+        432
+      ],
+      "id": "1b6a52c8-5901-4400-b7e3-0ac20ae60207",
+      "name": "Warning logs"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://127.0.0.1:8813/sse",
+        "serverTransport": "sse",
+        "include": "selected",
+        "includeTools": [
+          "write_file"
+        ],
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [
+        432,
+        432
+      ],
+      "id": "8a27c4de-bbb7-4a7d-8a58-7978cf147bd1",
+      "name": "Critical logs"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -48,
+        192
+      ],
+      "id": "1df46d54-9abb-4657-a280-7a2b86f7ed68",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Warning logs": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Critical logs": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fd65a9d3-dac0-4003-8bda-b5d634399646",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "01d710613fd81594a8bc8aae24c24dd7b8d0a7722bbe602fc9db39ba0aa755a2"
+  },
+  "nodeGroups": [],
+  "id": "k7qLa9dEMozm1OUg",
+  "tags": []
+}
