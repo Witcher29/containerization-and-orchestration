@@ -57,13 +57,7 @@ kind export logs --name lab5-calico ./artifacts/kind-logs
 
 Если `kind export logs` не срабатывает, проверьте `docker logs lab5-calico-control-plane` (если контейнер остался). Скрипт создания использует `--retain`, чтобы сохранить узлы для диагностики при неудаче. Не удаляйте остальные кластеры и не запускайте `docker system prune`.
 
-### Скриншот 1 — кластер и Calico
-
-Сохранить как `screenshots/01-calico-nodes.png`.
-
-![Место для скриншота 1 — kubectl get nodes и Calico pods](screenshots/01-calico-nodes.png)
-
-> **Вставить:** вывод `kubectl get nodes -o wide` и `kubectl get pods -n kube-system | grep calico` с состояниями `Ready`/`Running`.
+<img width="815" height="478" alt="image" src="https://github.com/user-attachments/assets/c6b15cea-5c2d-44af-abfa-27a27aed2c17" />
 
 ## 4. Развёртывание приложения
 
