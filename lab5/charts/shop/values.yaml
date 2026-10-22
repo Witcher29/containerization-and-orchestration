@@ -1,0 +1,131 @@
+commonLabels:
+  owner: team-shop
+  env: dev
+
+api:
+  replicaCount: 2
+  image:
+    repository: shop-api
+    tag: v1
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 80
+    targetPort: 8080
+    nodePort: 30080
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "50m"        # requests = limits -> Guaranteed
+      memory: "128Mi"
+  env:
+    port: "8080"
+    healthFail: "false"
+
+  scheduling:
+    strategy: topologySpreadConstraints
+
+    topologySpreadConstraints:
+      maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: shop-api
+          topologyKey: kubernetes.io/hostname
+
+worker:
+  replicaCount: 2
+  image:
+    repository: shop-worker
+    tag: v1
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "28Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+
+postgres:
+  image:
+    repository: docker.io/library/postgres
+    tag: "16-alpine"
+  service:
+    port: 5432
+  resources:
+    requests:
+      cpu: "200m"       # Поднял с 20m -> 200m, иначе не запустится
+      memory: "512Mi"   # Поднял с 128Mi -> 512Mi
+    limits:
+      cpu: "200m"       # Оставляем Guaranteed
+      memory: "512Mi"
+  auth:
+    user: shop
+    password: shop
+    db: shop
+
+batch:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: shop-batch
+    tag: v1
+    pullPolicy: IfNotPresent
+
+  # Burstable: requests заметно ниже limits (гвардрейлы Лабы 3 соблюдены — limits есть).
+  # Числа сдержанные под 4 CPU / 8 GB VM, чтобы Часть 2 не завалила кластер.
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "700m"
+      memory: "256Mi"
+
+  # Управление поведением batch через env, без пересборки образа.
+  env:
+    memoryTargetMiB: "200"
+    blockMiB: "10"
+    cpuBurn: "true"
+    allocIntervalMs: "100"
+
+  scheduling:
+    strategy: topologySpreadConstraints
+    topologySpreadConstraints:
+      maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: shop-batch
+          topologyKey: kubernetes.io/hostname
+
+priorityClasses:
+  critical:
+    name: shop-critical
+    value: 100000       # Высокий приоритет
+  batch:
+    name: shop-batch
+    value: -10          # Низкий приоритет (ниже системных, но поды будут жить)
+
+pdb:
+  api:
+    enabled: true
+    minAvailable: 1
+  postgres:
+    enabled: true
+    minAvailable: 1
+
+# Сетевые ограничения для ЛР 5. Node CIDR соответствует стандартной docker-сети kind.
+networkPolicy:
+  enabled: true
+  nodeCIDR: "172.18.0.0/16"
