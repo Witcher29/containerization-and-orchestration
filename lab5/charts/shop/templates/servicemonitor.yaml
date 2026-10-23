@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "shop.fullname" . }}-api
+  labels:
+    release: observability
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: shop-api          # Ищем сервис по этому лейблу
+  endpoints:
+    - port: http             # Имя порта в Service (у нас targetPort: http)
+      path: /metrics
+      interval: 15s

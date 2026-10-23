@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-alerts
+  labels:
+    release: observability
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+spec:
+  groups:
+    - name: shop.networking.rules
+      rules:
+        - alert: ShopApiTargetDown
+          expr: up{namespace="{{ .Release.Namespace }}", service="{{ include "shop.fullname" . }}-api"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Prometheus cannot scrape Shop API"
+            description: "Проверь ServiceMonitor, labels сервиса, доступность /metrics и NetworkPolicy для monitoring namespace."
+        - alert: ShopApiHighErrorRate
+          expr: sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}", code=~"5.."}[1m])) > 0
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Shop API returns HTTP 5xx"
+            description: "Проверь логи API, доступность PostgreSQL и egress NetworkPolicy."
+        - alert: ShopApiHighLatency
+          expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{ .Release.Namespace }}"}[2m])) by (le)) > 0.3
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Shop API p95 latency exceeds 300ms"
+            description: "Проверь нагрузку, состояние базы данных и сетевую задержку."
