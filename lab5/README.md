@@ -1,22 +1,15 @@
-# Лабораторная работа 5 — Kubernetes Networking, Calico и NetworkPolicy
-
-> **Статус отчёта:** конфигурация и команды подготовлены под существующий проект `shop` из лабораторных 2–4. Сетевые проверки, графики и скриншоты необходимо получить на своём компьютере после успешного запуска кластера. В местах, отмеченных `ЗАПОЛНИТЬ ПО ФАКТУ`, не нужно оставлять неподтверждённые результаты.
-
 ## 1. Цель работы
-
-Развернуть отдельный многонодовый кластер Kubernetes на `kind` с CNI Calico, проверить связь между Pod и Service, выставить API наружу через `NodePort`, ограничить сетевые соединения с помощью `NetworkPolicy`, проверить разрешённые и запрещённые потоки и продемонстрировать диагностику искусственно внесённой сетевой ошибки. Для метрик используется существующий стек Prometheus/Grafana из предыдущих лабораторных.
+Развернуть отдельный многонодовый кластер Kubernetes на `kind` с CNI Cilium, проверить связь между Pod и Service, выставить API наружу через `NodePort`, ограничить сетевые соединения с помощью `NetworkPolicy`, проверить разрешённые и запрещённые потоки и продемонстрировать диагностику искусственно внесённой сетевой ошибки. Для метрик используется стек Prometheus/Grafana.
 
 ## 2. Архитектура решения
-
-- **Cluster:** `lab5-calico` — отдельный кластер, чтобы не менять `observability-demo` и `lab4-scheduling`.
-- **CNI:** Calico `v3.28.0`, совместимый с используемым образом Kubernetes `v1.29.2`.
+- **Cluster:** `lab5` — отдельный кластер.
+- **CNI:** Cilium `v1.20.2` с включённым Hubble (для наблюдаемости).
 - **API:** `shop-api`, порт контейнера `8080`, Service `NodePort` `30080`.
-- **Worker:** `shop-worker`, инициирует соединения к PostgreSQL, входящие соединения ему не нужны.
+- **Worker:** `shop-worker`, инициирует соединения к PostgreSQL.
 - **Database:** CloudNativePG, Service записи `shop-postgres-rw`, порт `5432`.
-- **Observability:** Prometheus/Grafana из чарта предыдущей лабораторной; `ServiceMonitor` собирает `/metrics` с API.
+- **Observability:** Prometheus/Grafana; `ServiceMonitor` собирает метрики с API и Cilium.
 
 Схема сетевых потоков:
-
 ```text
 Host :30080
     |
@@ -29,11 +22,11 @@ NodePort Service shop-api :80 -> Pod shop-api :8080
 
 shop-worker ---------------- TCP/5432 ----------------> PostgreSQL
 Prometheus (namespace monitoring) -- TCP/8080 -------> shop-api /metrics
-```
 
 ## 3. Создание кластера с Calico
 
-В `cluster/kind-calico.yaml` отключён стандартный CNI `kindnet`, потому что CNI-интерфейсы и IPAM должен настраивать Calico. Для Pod-сети выбран CIDR `192.168.0.0/16`; он совпадает с пулом Calico в манифесте установки. Host-порт `30080` проброшен в control-plane контейнер kind, чтобы NodePort был доступен с хоста.
+В `cluster/kind-calico.yaml` отключён стандартный CNI `kindnet`, потому что CNI-интерфейсы и IPAM должен настраивать Calico.
+Для Pod-сети выбран CIDR `192.168.0.0/16`; он совпадает с пулом Calico в манифесте установки. Host-порт `30080` проброшен в control-plane контейнер kind, чтобы NodePort был доступен с хоста.
 
 ```bash
 make cluster-up
@@ -55,8 +48,6 @@ docker ps -a --filter name=lab5-calico
 kind export logs --name lab5-calico ./artifacts/kind-logs
 ```
 
-Если `kind export logs` не срабатывает, проверьте `docker logs lab5-calico-control-plane` (если контейнер остался). Скрипт создания использует `--retain`, чтобы сохранить узлы для диагностики при неудаче. Не удаляйте остальные кластеры и не запускайте `docker system prune`.
-
 <img width="815" height="478" alt="image" src="https://github.com/user-attachments/assets/c6b15cea-5c2d-44af-abfa-27a27aed2c17" />
 
 ## 4. Развёртывание приложения
@@ -67,7 +58,7 @@ kubectl get pods,svc -o wide
 kubectl get networkpolicy
 ```
 
-Скрипт устанавливает CloudNativePG operator, стек наблюдаемости, собирает локальные образы API/worker/batch, загружает их в `lab5-calico` и устанавливает чарт `shop`. Существующие лабораторные директории не изменяются.
+Скрипт устанавливает CloudNativePG operator, стек наблюдаемости, собирает локальные образы API/worker/batch, загружает их в `lab5-calico` и устанавливает чарт `shop`.
 
 Проверка API с хоста:
 
@@ -81,15 +72,9 @@ curl -i http://127.0.0.1:30080/health
 curl -i -X POST http://127.0.0.1:30080/order
 ```
 
-Ожидается успешный ответ JSON с `id` и `status`. Если база ещё инициализируется, дождитесь готовности `shop-postgres` и повторите запрос.
+Итоговая проверка:
 
-### Скриншот 2 — Service и NodePort
-
-Сохранить как `screenshots/02-nodeport-api.png`.
-
-![Место для скриншота 2 — Service NodePort и curl](screenshots/02-nodeport-api.png)
-
-> **Вставить:** `kubectl get svc shop-api` и успешный `curl http://127.0.0.1:30080/health`.
+<img width="927" height="354" alt="image" src="https://github.com/user-attachments/assets/b76667c5-997c-4588-a0ed-99a046e84d96" />
 
 ## 5. Политика сетевого доступа
 
@@ -112,13 +97,7 @@ curl -i -X POST http://127.0.0.1:30080/order
 
 Политики Kubernetes объединяются по разрешающим правилам: наличие default-deny не отменяет разрешения других NetworkPolicy. Поэтому разрешающие политики ограничены конкретными Pod-ролями, namespace и портами.
 
-### Скриншот 3 — NetworkPolicy
-
-Сохранить как `screenshots/03-network-policies.png`.
-
-![Место для скриншота 3 — список NetworkPolicy](screenshots/03-network-policies.png)
-
-> **Вставить:** `kubectl get networkpolicy` и при необходимости `kubectl describe networkpolicy shop-postgres-ingress`.
+<img width="925" height="390" alt="image" src="https://github.com/user-attachments/assets/650ae088-4a56-4f14-b113-4c80692469da" />
 
 ## 6. Проверка разрешённых и запрещённых соединений
 
@@ -134,15 +113,7 @@ make test-network
 - `api-client → shop-api:80` — соединение разрешено;
 - `denied-probe → shop-api:80` — соединение блокируется.
 
-**ЗАПОЛНИТЬ ПО ФАКТУ:** результат запуска `make test-network`: ____________________.
-
-### Скриншот 4 — проверка матрицы доступа
-
-Сохранить как `screenshots/04-connectivity-tests.png`.
-
-![Место для скриншота 4 — успешные и заблокированные подключения](screenshots/04-connectivity-tests.png)
-
-> **Вставить:** вывод `make test-network`, где видны разрешённые подключения и ожидаемые ошибки для запрещённых.
+<img width="921" height="524" alt="image" src="https://github.com/user-attachments/assets/4ecf7250-890d-40fd-bfec-f1fab8b509ed" />
 
 ## 7. Устойчивость Service при удалении Pod
 
@@ -156,105 +127,51 @@ curl -i http://127.0.0.1:30080/health
 kubectl get pods -l app=shop-api -o wide
 ```
 
-Deployment создаёт замену удалённому Pod. Service сохраняет стабильный адрес и выбирает доступные endpoints. На коротком промежутке во время завершения/создания Pod отдельный запрос может не пройти; поэтому нужно выполнить несколько запросов после восстановления готовности.
+Deployment создаёт замену удалённому Pod. Service сохраняет стабильный адрес и выбирает доступные endpoints.
+На коротком промежутке во время завершения/создания Pod отдельный запрос может не пройти; поэтому нужно выполнить несколько запросов после восстановления готовности.
 
-### Скриншот 5 — восстановление после удаления Pod
+<img width="925" height="755" alt="image" src="https://github.com/user-attachments/assets/65d31150-f6b3-43f0-8710-15bdef8ad7b7" />
 
-Сохранить как `screenshots/05-service-resilience.png`.
+<img width="926" height="926" alt="image" src="https://github.com/user-attachments/assets/ecadd204-c96f-40a8-b1ab-bd3c1125821f" />
 
-![Место для скриншота 5 — удаление и восстановление API pod](screenshots/05-service-resilience.png)
 
-> **Вставить:** до/после `kubectl get pods -l app=shop-api -o wide`, успешный rollout и curl.
+## 8. Мониторинг и алертинг
 
-## 8. Нагрузочное тестирование и мониторинг
+Для сбора метрик и визуализации используется стек Prometheus и Grafana, развернутый в предыдущих лабораторных.
+В Helm-чарт добавлены `ServiceMonitor` для сбора метрик с API и Cilium, а также `PrometheusRule`.
 
-Запустить тест из каталога `lab5`:
+1. **API request rate и API error rate:** Ровная зеленая линия на уровне ~1 запроса в секунду доказывает, что API стабильно обрабатывает запросы. При этом график ошибок (`API error rate`) находится на нуле — значит, все запросы доходят до базы данных, потерь нет.
+2. **TCP connection events:** Показывает сетевую активность на уровне TCP (SYN и RST пакеты). Это подтверждает, что Service корректно перенаправляет трафик.
+3. **Dropped traffic:** Желтая линия **`POLICY_DENIED / TCP`** — это результат работы нашего тестового пода-нарушителя (`intruder-probe`), который пытался достучаться до базы данных. Сетевая политика Cilium мгновенно заблокировала этот трафик, и Grafana зафиксировала его как отброшенный. Зеленая линия `UNSUPPORTED_L3_PROTOCOL / ICMPv6` — это служебный IPv6-трафик, который отбрасывается в нашем IPv4-кластере (это норма).
 
-```bash
-make load
-```
+<img width="1748" height="779" alt="image" src="https://github.com/user-attachments/assets/b5ee9cb2-d8ad-48a8-8c2e-77cbce62cc5f" />
 
-Если `k6` не установлен, используйте Docker-команду, которую выводит скрипт `scripts/load-test.sh`. По умолчанию сценарий обращается к `http://127.0.0.1:30080`.
+1. **Hubble flow verdicts:** Стабильный график `FORWARDED / TCP` (около 45 пакетов в секунду) доказывает, что разрешенный трафик (API -> БД, Prometheus -> API) успешно проходит через сеть.
+2. Также видны единичные отбросы `DROPPED / ICMPv6` — это служебный IPv6-трафик, который Cilium блокирует по умолчанию в нашем IPv4-кластере.
+3. **CoreDNS request rate и responses:** Показывают, что кластер активно использует DNS для разрешения имен сервисов (запросы UDP/A и ответы NOERROR), при этом есть редкие запросы NXDOMAIN (обращение к несуществующим именам).
+4. **CoreDNS request duration p95:** Задержка DNS-запросов в основном держится на уровне 0, с редкими всплесками до 400 мс при первичном обращении.
 
-Prometheus/Grafana можно открыть так:
+<img width="1762" height="637" alt="image" src="https://github.com/user-attachments/assets/f9ac3cfb-7286-4f74-8fd9-86ae363eb5e8" />
 
-```bash
-make port-forward-prometheus
-# В другом терминале:
-make port-forward-grafana
-```
+Для проверки работоспособности алертинга был запущен временный под-нарушитель (`intruder-probe`), который пытался подключиться к базе данных по заблокированному порту.
+Это вызвало всплеск метрики `POLICY_DENIED`, и система мониторинга мгновенно отреагировала.
 
-- Prometheus: `http://127.0.0.1:9090`
-- Grafana: `http://127.0.0.1:3000` (логин/пароль из `observability/values.yaml`; в текущем конфиге `admin/admin`).
+<img width="1740" height="283" alt="image" src="https://github.com/user-attachments/assets/3e0b1516-0390-437f-af9f-198cfc8ab6f4" />
 
-В Helm-чарт добавлен `ServiceMonitor` для `/metrics` и три правила:
+## 9. Визуализация потоков и диагностика в Hubble
 
-1. **`ShopApiTargetDown`** — Prometheus не может опросить API; помогает найти проблему ServiceMonitor, endpoints или ingress NetworkPolicy.
-2. **`ShopApiHighErrorRate`** — появляются HTTP 5xx; помогает обнаружить сбой API→PostgreSQL или другую серверную ошибку.
-3. **`ShopApiHighLatency`** — p95 превышает 300 мс; указывает на деградацию задержки под нагрузкой.
+Для наглядного отображения работы сетевых политик используется инструмент Hubble UI, который входит в стек Cilium. Он позволяет в реальном времени видеть, какие соединения разрешены, а какие блокируются.
 
-**ЗАПОЛНИТЬ ПО ФАКТУ:** длительность теста, количество запросов, p95, процент ошибок: ____________________.
+На скриншоте ниже представлен граф потоков в namespace `shop`:
 
-### Скриншот 6 — метрики и нагрузочный тест
+<img width="1423" height="766" alt="image" src="https://github.com/user-attachments/assets/24e26439-a83e-4d7f-b7b6-23acffd22689" />
 
-Сохранить как `screenshots/06-k6-summary.png`.
+1. **Граф (сверху):** 
+   * Зеленые линии показывают разрешенный трафик: `worker` успешно подключается к `postgres` (порт 5432), а `prometheus` собирает метрики с `api` (порт 8080).
+   * **Красная линия** — это заблокированный трафик. Оператор `cloudnative-pg` (из namespace `cnpg-system`) пытается достучаться до `postgres`, но сетевая политика (NetworkPolicy) запрещает это соединение.
+2. **Таблица потоков (снизу):** 
+   * Колонка `Verdict` показывает результат: `forwarded` (разрешено) для разрешенных потоков и `dropped` (отброшено) для запрещенных.
+   * Видно, что `cloudnative-pg` пытается подключиться к порту `8000`, но получает `dropped`. Это доказывает, что политика **default-deny** работает и блокирует доступ из других namespace'ов к базе данных, кроме разрешенных.
 
-![Место для скриншота 6 — summary k6](screenshots/06-k6-summary.png)
+Этот же инструмент использовался для поиска «скрытой поломки» (когда мы намеренно нарушили связь API с БД): по красным линиям в Hubble можно мгновенно определить, на каком именно порту и между какими подами блокируется соединение.
 
-### Скриншот 7 — Prometheus / Grafana
-
-Сохранить как `screenshots/07-prometheus-grafana.png`.
-
-![Место для скриншота 7 — метрики API или панель Grafana](screenshots/07-prometheus-grafana.png)
-
-### Скриншот 8 — правила алертов
-
-Сохранить как `screenshots/08-alert-rules.png`.
-
-![Место для скриншота 8 — три правила в Prometheus](screenshots/08-alert-rules.png)
-
-## 9. Диагностика искусственной сетевой ошибки
-
-Сценарий удаляет разрешающее правило egress для API. Это намеренно ломает соединение `shop-api → PostgreSQL`, при этом Pod и Service API остаются запущены. Внешне это проявляется как HTTP 500 при создании заказа; причина видна в логах API, а метрика `http_requests_total` растёт по коду `5..`.
-
-1. Перед экспериментом убедиться, что API работает: `curl -i -X POST http://127.0.0.1:30080/order`.
-2. Запустить `make fault`.
-3. В течение 30–60 секунд повторить POST-запросы.
-4. Посмотреть `kubectl logs deploy/shop-api --since=2m` и проверить `ShopApiHighErrorRate` в Prometheus.
-5. Немедленно восстановить политику: `make restore`.
-6. Убедиться, что POST снова проходит и количество ошибок перестало расти.
-
-Не оставляйте политику удалённой после эксперимента: default-deny продолжит блокировать egress API, пока Helm не восстановит `shop-api-egress`.
-
-### Скриншот 9 — обнаружение и исправление ошибки
-
-Сохранить как `screenshots/09-network-fault.png`.
-
-![Место для скриншота 9 — HTTP 500, лог ошибки и firing alert](screenshots/09-network-fault.png)
-
-> **Вставить:** запрос с HTTP 500, лог ошибки подключения к PostgreSQL и alert в состоянии `firing`. Отдельно сохранить подтверждение восстановления после `make restore`.
-
-## 10. Итоговые выводы
-
-В работе создаётся отдельный кластер `kind` с Calico, что позволяет применять сетевые политики. `NodePort` предоставляет API с хоста, а `Service` сохраняет стабильную точку доступа при замене Pod. `NetworkPolicy` реализует default-deny и разрешает только необходимые потоки: API/worker к PostgreSQL, DNS и сбор метрик Prometheus. Проверка матрицы доступа демонстрирует не только успешные соединения, но и блокировку неразрешённых потоков. Внесение ошибки через удаление egress-правила показывает, как сопоставлять HTTP 5xx, логи приложения, сетевые политики и Prometheus alerts.
-
-**Финальный статус выполнения:**
-
-- [ ] Кластер `lab5-calico` создан, все узлы `Ready`.
-- [ ] Calico работает на всех узлах.
-- [ ] API доступен на `http://127.0.0.1:30080`.
-- [ ] Матрица NetworkPolicy проверена, отрицательные тесты действительно блокируются.
-- [ ] Проверено восстановление API Pod после удаления.
-- [ ] Нагрузочный тест выполнен; реальные p95 и error rate внесены выше.
-- [ ] Проверены три алерта; хотя бы один реально наблюдался в `firing` при контролируемой неисправности.
-- [ ] Все скриншоты сохранены в `screenshots/`.
-
-## 11. Очистка
-
-Удалить только кластер этой лабораторной:
-
-```bash
-make cluster-down
-```
-
-Команда не затрагивает `observability-demo` и `lab4-scheduling`.
