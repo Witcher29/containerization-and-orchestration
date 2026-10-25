@@ -1,0 +1,32 @@
+kubeProxyReplacement: true
+routingMode: tunnel
+tunnelProtocol: vxlan
+ipam:
+  mode: kubernetes
+k8sServiceHost: lab5-control-plane
+k8sServicePort: 6443
+securityContext:
+  privileged: true
+operator:
+  replicas: 1
+  extraArgs:
+    - "--operator-api-serve-addr=127.0.0.1:9234"
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+  metrics:
+    enabled:
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - port-distribution
+    serviceMonitor:
+      enabled: false
+  networkPolicyCorrelation:
+    enabled: true
+dnsProxy:
+  enabled: false

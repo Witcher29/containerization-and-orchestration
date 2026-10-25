@@ -1,36 +1,58 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "shop.fullname" . }}-worker
+  name: {{ .Release.Name }}-worker
   labels:
-    app: shop-worker
-    {{- toYaml .Values.commonLabels | nindent 4 }}
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: shop
 spec:
   replicas: {{ .Values.worker.replicaCount }}
   selector:
     matchLabels:
-      app: shop-worker
+      app.kubernetes.io/name: worker
+      app.kubernetes.io/part-of: shop
   template:
     metadata:
       labels:
-        app: shop-worker
-        network-role: worker
-        {{- toYaml .Values.commonLabels | nindent 8 }}
+        app.kubernetes.io/name: worker
+        app.kubernetes.io/part-of: shop
     spec:
+      securityContext:
+        runAsNonRoot: true
       containers:
         - name: worker
           image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           env:
             - name: POSTGRES_HOST
-              value: {{ include "shop.fullname" . }}-postgres-rw
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-app
+                  key: host
             - name: POSTGRES_PORT
-              value: {{ .Values.postgres.service.port | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-app
+                  key: port
             - name: POSTGRES_USER
-              value: {{ .Values.postgres.auth.user | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-app
+                  key: username
             - name: POSTGRES_PASSWORD
-              value: {{ .Values.postgres.auth.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-app
+                  key: password
             - name: POSTGRES_DB
-              value: {{ .Values.postgres.auth.db | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-app
+                  key: dbname
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
