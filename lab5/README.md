@@ -9,46 +9,18 @@
 - **Database:** CloudNativePG, Service записи `shop-postgres-rw`, порт `5432`.
 - **Observability:** Prometheus/Grafana; `ServiceMonitor` собирает метрики с API и Cilium.
 
-Схема сетевых потоков:
-```text
-Host :30080
-    |
-    v
-NodePort Service shop-api :80 -> Pod shop-api :8080
-                                      |
-                                      | TCP/5432
-                                      v
-                              shop-postgres-rw
+## 3. Создание кластера с Cilium
 
-shop-worker ---------------- TCP/5432 ----------------> PostgreSQL
-Prometheus (namespace monitoring) -- TCP/8080 -------> shop-api /metrics
+В `cluster/kind-config.yaml` отключён стандартный CNI `kindnet`, потому что сетевые политики и маршрутизацию должен обеспечивать Cilium. Для Pod-сети выбрана `10.50.0.0/16`.
+Host-порт `30080` проброшен в control-plane контейнер kind, чтобы NodePort был доступен с хоста.
 
-## 3. Создание кластера с Calico
-
-В `cluster/kind-calico.yaml` отключён стандартный CNI `kindnet`, потому что CNI-интерфейсы и IPAM должен настраивать Calico.
-Для Pod-сети выбран CIDR `192.168.0.0/16`; он совпадает с пулом Calico в манифесте установки. Host-порт `30080` проброшен в control-plane контейнер kind, чтобы NodePort был доступен с хоста.
+Для установки Cilium используется Helm-чарт с параметрами `kubeProxyReplacement: true` и `routingMode: tunnel`. Также включён Hubble для наблюдаемости.
 
 ```bash
 make cluster-up
-make calico
-kubectl config current-context
+helm upgrade --install cilium cilium/cilium --version 1.20.2 --namespace kube-system -f cilium-values.yaml
 kubectl get nodes -o wide
-kubectl get pods -n kube-system -o wide | grep calico
-kubectl get ippools.crd.projectcalico.org
-```
-
-Ожидаемое состояние: три узла `Ready`, по одному Pod `calico-node` на каждом узле и работающий `calico-kube-controllers`.
-
-**Если `kind create cluster` завершается ошибкой** с `could not find a log line that matches "Reached target ... Multi-User System"`, скрипт пытается сохранить диагностические логи в `artifacts/kind-logs`. Это ошибка запуска контейнерного узла, а не результат работы NetworkPolicy. Выполните:
-
-```bash
-docker info | grep -E 'Server Version|Cgroup Driver|Cgroup Version|Operating System'
-kind version
-docker ps -a --filter name=lab5-calico
-kind export logs --name lab5-calico ./artifacts/kind-logs
-```
-
-<img width="815" height="478" alt="image" src="https://github.com/user-attachments/assets/c6b15cea-5c2d-44af-abfa-27a27aed2c17" />
+kubectl get pods -n kube-system -l k8s-app=cilium
 
 ## 4. Развёртывание приложения
 
@@ -57,8 +29,6 @@ make deploy
 kubectl get pods,svc -o wide
 kubectl get networkpolicy
 ```
-
-Скрипт устанавливает CloudNativePG operator, стек наблюдаемости, собирает локальные образы API/worker/batch, загружает их в `lab5-calico` и устанавливает чарт `shop`.
 
 Проверка API с хоста:
 
@@ -175,3 +145,29 @@ Deployment создаёт замену удалённому Pod. Service сох�
 
 Этот же инструмент использовался для поиска «скрытой поломки» (когда мы намеренно нарушили связь API с БД): по красным линиям в Hubble можно мгновенно определить, на каком именно порту и между какими подами блокируется соединение.
 
+
+## Ответы на дополнительные вопросы
+
+### k6-pod.yaml почему это плохая идея файла и не стоит делать ямл для пода?
+
+Если k6 во время теста упадет (например, из-за нехватки памяти или сетевой ошибки), этот под просто умрет и больше не поднимется. Тест прервется, и данные потеряются. Если бы мы использовали Job, Kubernetes сам бы пересоздал под и тест пошел бы дальше. В нашем случае k6 отрабатывает 4 минуты, а потом завершается. Чтобы мы могли посмотреть логи после теста, в yaml в args прописан sleep 3600 в конец скрипта, так под живёт подольше.
+
+### chaos-pods.sh что делает скрипт? по шагам
+
+Он нужен, чтобы имитировать внезапные падения подов и проверить, справится ли сеть и Service.
+
+Шаги:
+
+1. Скрипт читает переменные (сколько секунд длится тест, раз в сколько секунд убивать под).
+
+2. Начинается цикл while, который работает, пока не выйдет таймер.
+
+3. Обращается к Kubernetes и просит список подов, которые сейчас запущены (Running). Ищет он только поды с метками api или worker.
+
+4. Из оставшихся подов выбирается случайный под для убийства.
+
+5. Перед удалением в консоль выводится подробная строка лога: имя пода-жертвы, его IP-адрес, роль (api или worker), количество готовых реплик в деплойментах (отдельно для api и worker), а также список IP-адресов всех готовых эндпоинтов сервиса shop-api.
+
+6. Выполняется команда kubectl delete pod <имя>. Причем делается это с флагом --wait=false — то есть скрипт не ждёт окончания смерти пода.
+
+7. Засыпает на пару секунд (например, на 4) и возвращается к шагу 2, чтобы выбрать следующего.
